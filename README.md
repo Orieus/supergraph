@@ -1,12 +1,10 @@
-# RDIgraphs
+# Supergraph
 
-<img src="https://github.com/Orieus/PTL_RDIgraphs/blob/master/figures/supergraph.png" width="400">
+<img src="https://github.com/Orieus/supergraph/blob/master/figures/supergraph.png" width="400">
 
-**RDIgraphs** is a generic software for the management and processing of a interrelated collection of multiple graphs. 
+**Supergraph** is a generic software for the management and processing of a interrelated collection of multiple graphs. 
 
-It was initially conceived for the processing of multiple corpus of scientific publications, patents and project proposals, inside the project "**Service for Identifying Impact and R&D&I Agent Collaboration Networks**" (*Servicio para Identificar Impacto y Redes de Colaboración de Agentes I+D+i*), funded by the **Secretary of State for the Digital Agenda** (SEAD, Secretaría de Estado para la Agenda Digital), under the umbrella of the Spanish Plan for the Stimulus of Language Tecnologies (PTL, [*Plan de Impulso de las Tecnologías del Lenguaje*](https://www.plantl.gob.es/Paginas/index.aspx)).
-
-However, the whole sofware package has a general purpose. It can be used to process multiple graphs. Functionality include (but it is not limited to):
+It can be used to process multiple graphs. Functionality include (but it is not limited to):
 
 1. **Similarity graphs**: generated from node attributes, based on different similarity measures (Jensen-Shannon, Hellinger, L1, L2).
     * General implementations based on the `neighbors` module from [scikit-learn](https://scikit-learn.org/stable/).
@@ -36,7 +34,7 @@ However, the whole sofware package has a general purpose. It can be used to proc
 The software includes two applications that can be used to generate and manipulate graphs through an interactive menu:
 
 * `mainRDIgraphs.py`: Provides accces to the sofware functionality through an interative menu. It reads the links to the source data from a configuration file (`parameters.yaml`). You would need to edit this file to use other data.
-* `mainRDIlab.py`: This is a specific application for the SEAD project. It uses the software functionality to carry out experiments for analysing RDI corpus collections.
+* `mainRDIlab.py`: It uses the software functionality to carry out experiments for analysing RDI corpus collections.
 
 Write
 
@@ -54,7 +52,11 @@ The software include several class packages that can be used independently. Clas
    * `DataGraph` (requires `SimGraph` and `CommunityPlus`): provides tools for graph processing and analysis.
    * `SuperGraph` (requires `DataGraph`): provides tools for handling collections of DataGraph objects, including tools for the generation of new datagraphs.
 
-### 
+### Additional information
 
-You can find more detailed information about this software in the [Wiki](https://github.com/Orieus/PTL_RDIgraphs/wiki).
+You can find more detailed information about this software in the [Wiki](https://github.com/Orieus/supergraph/wiki).
+
+This project was initially conceived for the processing of multiple corpus of scientific publications, patents and project proposals, inside the project "**Service for Identifying Impact and R&D&I Agent Collaboration Networks**" (*Servicio para Identificar Impacto y Redes de Colaboración de Agentes I+D+i*), funded by the **Secretary of State for the Digital Agenda** (SEAD, Secretaría de Estado para la Agenda Digital), under the umbrella of the Spanish Plan for the Stimulus of Language Tecnologies (PTL, [*Plan de Impulso de las Tecnologías del Lenguaje*](https://www.plantl.gob.es/Paginas/index.aspx)).
+
+
 
