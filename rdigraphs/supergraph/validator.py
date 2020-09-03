@@ -48,7 +48,7 @@ class Validator(object):
 
         Parameters
         ----------
-        corpus_name: str {'S24Ever', 'Crunchbase'}
+        corpus_name: str {'S2', 'Crunchbase'}
             Name of the corpus to validate
         DM : DataManager object
             It will provide access to data repositories.
@@ -64,7 +64,7 @@ class Validator(object):
         epn : int, optional (default=100)
             Average number of edges per node in the graphs used for validation
         ref_graph_nodes_init : int, optional (default=100_000)
-            Size of the initial set of nodes (only for Crunch4Ever)
+            Size of the initial set of nodes (only for Crunch)
         ref_graph_nodes_target : int, optional (default=20_000)
             Target numer of nodes in the reference graph (only for CrunchEver)
         ref_graph_epn : int, optional (default=100)
@@ -101,7 +101,7 @@ class Validator(object):
         # Parameters for the reference graphs
 
         # Size of the initial set of nodes taken from the DB to compute the
-        # reference graph (only for Crunch4Ever)
+        # reference graph (only for Crunch)
         self.n_nodes_db = ref_graph_nodes_init
         # Target number of nodes in the reference graph
         self.n_nodes_rg = ref_graph_nodes_target
@@ -284,7 +284,7 @@ class Validator(object):
         logging.info(f'-- -- {len(nodes_tm)} nodes in the topic models')
 
         # Read db table
-        if self.corpus_name == 'Crunch4Ever':
+        if self.corpus_name == 'Crunch':
 
             # #############################
             # REFERENCE GRAPH FOR COMPANIES
@@ -292,10 +292,10 @@ class Validator(object):
 
             # Load all nodes and its category attribute from database
             logging.info('-- Reading nodes from database')
-            df = self.DM['Crunch4Ever'].readDBtable(
+            df = self.DM['Crunch'].readDBtable(
                 'CompanyCat', limit=None, selectOptions=None,
                 filterOptions=None, orderOptions=None)
-            # df = self.DM['Crunch4Ever'].readDBtable(
+            # df = self.DM['Crunch'].readDBtable(
             #     'CompanyGroupCat', limit=None, selectOptions=None,
             #     filterOptions=None, orderOptions=None)
             att = 'categoryID'
@@ -345,7 +345,7 @@ class Validator(object):
                 rescale=False, blocksize=self.blocksize, useGPU=self.useGPU,
                 tmp_folder=None, save_every=20_000_000, verbose=False)
 
-        elif self.corpus_name == 'S24Ever':
+        elif self.corpus_name == 'S2':
 
             # ####################################
             # REFERENCE GRAPH FOR SEMANTIC SCHOLAR
@@ -362,7 +362,7 @@ class Validator(object):
             # ---- Attributes: citationID, S2paperID1, S2paperID2
             # ---- No. of rows: 86260982
             # Load nodes (and the relevant attributes only)
-            df_nodes_db = self.DM['S24Ever'].readDBtable(
+            df_nodes_db = self.DM['S2'].readDBtable(
                 'S2papers', limit=None, selectOptions='paperID, S2paperID',
                 filterOptions=None, orderOptions=None)
             logging.info(f'-- -- {len(df_nodes_db)} nodes in the database')
@@ -377,7 +377,7 @@ class Validator(object):
 
             # Read edges from database
             logging.info('-- Reading citation data from database')
-            df_edges = self.DM['S24Ever'].readDBtable(
+            df_edges = self.DM['S2'].readDBtable(
                 'citations', limit=None, filterOptions=None,
                 orderOptions=None)
             logging.info(f'-- -- {len(df_edges)} edges in the database')
@@ -977,7 +977,7 @@ class Validator(object):
 
         Parameters
         ----------
-        corpus : str {'S24Ever', 'Crunch4Ever'}
+        corpus : str {'S2', 'Crunch'}
             Corpus (Pu: Semantic Scholar, or Co: Crunchbase data)
         """
 
@@ -1438,7 +1438,7 @@ class Validator(object):
 
         Parameters
         ----------
-        corpus : str {'S24Ever', 'Crunch4Ever'}
+        corpus : str {'S2', 'Crunch'}
             Corpus (Pu: Semantic Scholar, or Co: Crunchbase data)
         """
 
@@ -1842,7 +1842,7 @@ class Validator(object):
 
     def validate_subtrain_models(self):
         """
-        Analyzes the influence of the topic model on te quality of the
+        Analyzes the influence of the topic model on the quality of the
         similarity graphs
 
         The similarity graph is validated using a citations graph.
@@ -1855,7 +1855,7 @@ class Validator(object):
         logging.info("-- Computing all similarity graphs for validation...")
         logging.info(f"-- -- Number of edges per node: {epn}")
 
-        path2models = Path('/home/jarenas/github/TM4Ever/small_corpus_test')
+        path2models = Path('/home/jarenas/github/TM/small_corpus_test')
 
         # Compute graphs...
         self._compute_all_subtrain_simgraphs(
