@@ -186,6 +186,7 @@ class SimGraph(ThOps):
 
         if rescale:
             Rmax = min(R, Rmax)
+            R2max = min(R**2, R2max)
 
         # Compute similarities from distances
         if g != 1:
