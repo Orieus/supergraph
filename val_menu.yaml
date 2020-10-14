@@ -10,7 +10,6 @@ root:
     # - load      may have been selected by the starting command>
     - setup
     - show_SuperGraph
-    - validation_process
     - compute_reference_graph
     - subsample_reference_graph
     - compute_all_sim_graphs
