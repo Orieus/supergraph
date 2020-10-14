@@ -282,19 +282,19 @@ class SgTaskManager(object):
 
         # WARNING FOR THE DEVELOPER: Do not change prints by logging messages
         # because the logger is set after reading the configoration file,
-        # ones the project folder is stablished.
+        # once the project folder is stablished.
 
         # Check and clean project folder location
         if not os.path.exists(self.path2project):
-            print(f'-- Folder {self.path2project} does not exist. ' +
+            print(f'-- Folder {self.path2project} does not exist. '
                   'You must create the project first')
 
         # Check metadata file
         elif not os.path.exists(self.path2metadata):
             print(
-                f'-- ERROR: Metadata file {self.path2metadata} does not' +
-                '   exist.\n' +
-                '   This is likely not a project folder. Select another ' +
+                f'-- ERROR: Metadata file {self.path2metadata} does not'
+                '   exist.\n'
+                '   This is likely not a project folder. Select another '
                 'project or create a new one.')
 
         else:
@@ -321,8 +321,8 @@ class SgTaskManager(object):
                     f'-- Project {self.path2project} succesfully loaded.')
             else:
                 print(
-                    f'-- Project {self.path2project} loaded, but ' +
-                    'configuration file could not be activated. \n' +
+                    f'-- Project {self.path2project} loaded, but '
+                    'configuration file could not be activated. \n'
                     'Revise the configuration file and activate it.')
 
             # Load supergraph
@@ -373,7 +373,7 @@ class SgTaskManager(object):
         if self.ready2setup is False:
             # Here, print, and not logging, because the logger has not been
             # set up.
-            print("---- Error: you cannot setup a project that has not been " +
+            print("---- Error: you cannot setup a project that has not been "
                   "created or loaded")
             return
 

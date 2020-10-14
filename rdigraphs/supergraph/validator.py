@@ -40,9 +40,9 @@ class Validator(object):
                    'metagraph': Path('metagraph')}
 
     def __init__(self, corpus_name, DM, model2val, path2val, path2out,
-                 epn=100, ref_graph_nodes_init=100_000,
+                 epn=100, ref_graph_nodes_init=100_000, ref_graph_prefix='RG',
                  ref_graph_nodes_target=20_000, ref_graph_epn=100,
-                 blocksize=25_000, useGPU=False):
+                 blocksize=25_000, useGPU=False, models_fname='modelo.npz'):
         """
         Initializes the Validator object
 
@@ -63,6 +63,9 @@ class Validator(object):
             Name of the output folder in the validation path
         epn : int, optional (default=100)
             Average number of edges per node in the graphs used for validation
+        ref_graph_prefix : str, optional (default='RG')
+            Prefix for the names of the reference graph and their subsampled
+            versions
         ref_graph_nodes_init : int, optional (default=100_000)
             Size of the initial set of nodes (only for Crunch)
         ref_graph_nodes_target : int, optional (default=20_000)
@@ -76,6 +79,8 @@ class Validator(object):
         useGPU : boolean, optional (defautl=False)
             If True, cupy library will be used to carry out some matrix
             multiplications
+        models_fname : str, optional (default='modelo.npz')
+            Name of the files containing the topic models to validate
         """
 
         # Name of the corpus to validate
@@ -96,6 +101,11 @@ class Validator(object):
 
         # Dictionary of available models
         self.model = model2val
+        # Name of the files containing the topic models to validate
+        self.models_fname = models_fname
+        # Prefix for the names of the reference graph and their subsampled
+        # versions
+        self.ref_graph_prefix = ref_graph_prefix
 
         # ###################################
         # Parameters for the reference graphs
@@ -134,8 +144,6 @@ class Validator(object):
         ----------
         fpath : str or pathlib.Path
             Path to the file that contains the topic model.
-            (the data file is assumed to be modelo.npz or modelo_sparse.npz
-            inside that folder)
         fields : str or list, optional (default=['thetas'])
             Name of the field or fields containing the doc-topic matrix
         sparse : bool, optional (default=False)
@@ -164,10 +172,8 @@ class Validator(object):
         if len(fnpz) == 1:
             path2topics = os.path.join(fpath, fnpz[0])
         # otherwise, take the one with the specified names
-        elif sparse:
-            path2topics = os.path.join(fpath, 'modelo_sparse.npz')
         else:
-            path2topics = os.path.join(fpath, 'modelo.npz')
+            path2topics = os.path.join(fpath, self.models_fname)
 
         if path2nodenames is None:
             path2nodenames = os.path.join(fpath, 'docs_metadata.csv')
@@ -203,8 +209,17 @@ class Validator(object):
         # LOADING NAMES
 
         if os.path.isfile(path2nodenames):
-            df_nodes = pd.read_csv(path2nodenames, usecols=[ref_col],
-                                   lineterminator='\n')
+            # I don't like this try, but I have found cases where using
+            # lineterminator='\n' the column name is taken with a final '\r'
+            # which causes a mismatch error with the expected ref_col name.
+            try:
+                # Note that node names are loaded as string type.
+                df_nodes = pd.read_csv(path2nodenames, usecols=[ref_col],
+                                       lineterminator='\n', dtype=str)
+            except:
+                df_nodes = pd.read_csv(path2nodenames, usecols=[ref_col],
+                                       dtype=str)
+
         else:
             logging.info(f'-- -- File {path2nodenames} with node names does '
                          'not exist. No dataframe of nodes is returned')
@@ -327,7 +342,7 @@ class Validator(object):
             # Compute similarity graph
 
             # Initialize graph with the full feature matrix and all nodes
-            graph_name = f'{self.corpus_name}_ref'
+            graph_name = self.ref_graph_prefix
             self.SG.makeSuperNode(label=graph_name, nodes=nodes_db, T=T)
             # Select nodes that are in the topic models only.
             self.SG.sub_snode(graph_name, nodes_tm, sampleT=True)
@@ -434,7 +449,7 @@ class Validator(object):
             # Compute similarity graph
 
             # Create datagraph with the full feature matrix
-            graph_name = f'{self.corpus_name}_ref'
+            graph_name = self.ref_graph_prefix
             self.SG.makeSuperNode(label=graph_name, nodes=nodes, T=T)
             # self.SG.sub_snode(graph_name, self.n_nodes_rg, ylabel=graph_name,
             #                   sampleT=True)
@@ -467,17 +482,103 @@ class Validator(object):
         cc = self.SG.snodes[graph_name].df_nodes['cc'].tolist()
         rr = Counter(cc)
         logging.info(f"-- Largest connected component with {rr[0]} nodes")
-        ylabel = f'{self.corpus_name}_ref_{self.n_nodes_rg}'
+        ylabel = f'{self.ref_graph_prefix}_{self.n_nodes_rg}'
         self.SG.sub_snode_by_value(graph_name, 'cc', 0)
 
         self.SG.sub_snode(graph_name, self.n_nodes_rg, ylabel=ylabel)
 
         # Save graph: nodes and edges
         self.SG.save_supergraph()
-        logging.info(f'Reference graph {ylabel} save, with {self.n_nodes_rg} '
+        logging.info(f'Reference graph {ylabel} saved, with {self.n_nodes_rg} '
                      f'nodes and {self.SG.snodes[ylabel].n_edges} edges')
 
         # Reset snode. This is to save memory.
+        self.SG.deactivate()
+
+        return
+
+    def subsample_reference_graph(self):
+        """
+        Computes a reference graph for a given corpus, based on metadata.
+        """
+
+        # ##########
+        # Parameters
+
+        # Parameters from the corpus
+        corpus_data = self.model
+        # The column in the database containing the node identifiers
+        ref_col = corpus_data['ref_col']
+        # Path to the file containing the metadata, including the node names,
+        # which is common to all models
+        path2nodenames = corpus_data['path2nodenames']
+        path2models = corpus_data['path2models']
+
+        # ####################
+        # Load reference graph
+
+        logging.info('-- Loading reference graph')
+        label_RG = self.ref_graph_prefix
+        self.SG.activate_snode(label_RG)
+
+        # ###############################
+        # Read data from the topic models
+
+        # We need to read the topic models because some nodes in the reference
+        # graph might not exist in the topic models.
+        # Thus, we will select from the reference graph the nodes in the topic
+        # models only.
+
+        # Get an arbitrary topic model to get the list of nodes
+        logging.info('-- Loading topic models')
+        fpath = None
+        for folder in os.listdir(path2models):
+            p = path2models / folder
+            if os.path.isdir(p) and self.models_fname in os.listdir(p):
+                fpath = p
+                break
+        if fpath is None:
+            logging.error(f"-- No topic models found in {path2models}. ")
+            return
+
+        # Read topic model nodes
+        df_nodes_tm = self.readCoordsFromFile(
+            fpath=fpath, sparse=True, path2nodenames=path2nodenames,
+            ref_col=ref_col)[1]
+
+        # This is the complete list of nodes in the topic models
+        nodes_tm = df_nodes_tm[ref_col].tolist()
+        logging.info(f'-- -- {len(nodes_tm)} nodes in the topic models')
+
+        # ###############
+        # Filtering nodes
+
+        # Select nodes that are in the topic models only
+        nodes_RG = self.SG.snodes[label_RG].nodes
+        nodes_common = sorted(list(set(nodes_RG).intersection(nodes_tm)))
+        logging.info(f'-- -- {len(nodes_RG)} nodes in the reference graph')
+        logging.info(f'-- -- {len(nodes_common)} common nodes')
+        if len(nodes_common) < len(nodes_RG):
+            # Remove node out of the topic model.
+            self.SG.sub_snode(
+                label_RG, nodes_common, sampleT=True, save_T=True)
+
+        # ###########
+        # Subsampling
+
+        # Subsample nodes
+        ylabel = f'{label_RG}_{self.n_nodes_rg}'
+        self.SG.sub_snode(label_RG, self.n_nodes_rg, ylabel=ylabel)
+
+        # #############
+        # Save and exit
+
+        # Save graph: nodes and edges
+        self.SG.save_supergraph()
+        logging.info(f'Reference graph {ylabel} saved, with {self.n_nodes_rg} '
+                     f'nodes and {self.SG.snodes[ylabel].n_edges} edges')
+
+        # Reset snodes. This is to save memory.
         self.SG.deactivate()
 
         return
@@ -519,6 +620,7 @@ class Validator(object):
 
         # Load reference graph from DB or from a file in the supergraph.
         logging.info('-- -- Loading reference graph...')
+        breakpoint()
         if label_RG not in self.SG.metagraph.nodes:
             logging.error("-- Reference graph does not exist. Use "
                           "self.compute_reference_graph() first")
@@ -588,10 +690,15 @@ class Validator(object):
         Computes all similarity graphs from the available topic models for a
         given corpus, and saves them in a supergraph structure, to be used
         later in validation processes.
+
+        Parameters
+        ----------
+        ref_graph: str or None, optional (default=None)
+            Name of the reference graph. If None, a standard name is computed
+            from the corpus name and the number of nodes
         """
 
         logging.info("Computing all similarity graphs for validation...")
-        ref_graph = f'{self.corpus_name}_ref_{self.n_nodes_rg}'
         corpus_data = self.model
         path2nodenames = corpus_data['path2nodenames']
         path2models = corpus_data['path2models']
@@ -601,8 +708,9 @@ class Validator(object):
         print(f"Number of edges per node: {self.epn}")
 
         # Validate modesl, one by one..
+        label_RG = f'{self.ref_graph_prefix}_{self.n_nodes_rg}'
         self._compute_all_sim_graphs(
-            path2models, path2nodenames, self.corpus_name, ref_graph,
+            path2models, path2nodenames, self.corpus_name, label_RG,
             epn=self.epn, ref_col=ref_col)
 
         return

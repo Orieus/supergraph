@@ -112,7 +112,7 @@ class SuperGraph(object):
         for label in self.metagraph.nodes:
             snode_folder = os.path.join(self.path2snodes, label)
             if not os.path.isdir(snode_folder):
-                logging.warning(f'---- Graph {label} does no longer exist. ' +
+                logging.warning(f'---- Graph {label} does no longer exist. '
                                 f' Removed from the supergraph structure')
                 self.drop_snode(label)
 
@@ -123,7 +123,7 @@ class SuperGraph(object):
 
             sedge_folder = os.path.join(self.path2sedges, label)
             if not os.path.isdir(sedge_folder):
-                logging.warning(f'---- Bigraph {label} does no longer exist.' +
+                logging.warning(f'---- Bigraph {label} does no longer exist.'
                                 f' Removed from the supergraph structure')
                 self.drop_sedge(label)
 
@@ -169,9 +169,9 @@ class SuperGraph(object):
 
         label = sedge.label_source + '_2_' + sedge.label_target
 
-        if (sedge.label_source not in self.snodes or
-                sedge.label_target not in self.snodes):
-            logging.error('The source and target snodes of the new sedge ' +
+        if (sedge.label_source not in self.snodes
+                or sedge.label_target not in self.snodes):
+            logging.error('The source and target snodes of the new sedge '
                           'should be loaded in the supergraph')
         else:
             self.sedges[label] = sedge
@@ -211,11 +211,12 @@ class SuperGraph(object):
 
         if label in self.snodes or self.is_snode(label):
             logging.warning(
-                f'-- -- An snode named {label} already exists in the ' +
+                f'-- -- An snode named {label} already exists in the '
                 'supergraph.')
             logging.warning(
-                f'-- -- The old snode will be removed. Note that sedges ' +
-                f'from the old snode could not be consistent with the new one')
+                '-- -- The old snode will be removed. Note that sedges '
+                'starting or ending in the old snode could not be consistent '
+                'with the new one')
             self.drop_snode(label)
 
         if out_path is None:
@@ -351,8 +352,8 @@ class SuperGraph(object):
             True if sedge exists, False otherwise
         """
 
-        return ((self.metagraph.n_edges > 0) and
-                (e_label in self.metagraph.df_edges['label'].tolist()))
+        return ((self.metagraph.n_edges > 0)
+                and (e_label in self.metagraph.df_edges['label'].tolist()))
 
     def is_active_snode(self, label):
         """
@@ -815,8 +816,8 @@ class SuperGraph(object):
 
         # This is just to check possible errors
         if Teq.shape[0] != len(nodes1):
-            logging.error("-- -- The number of clusters is not equal to the " +
-                          "number of rows in Teq. This is unexpected and " +
+            logging.error("-- -- The number of clusters is not equal to the "
+                          "number of rows in Teq. This is unexpected and "
                           "will likely cause errors")
 
         s1 = DataGraph(label=target, path=path_snode)
@@ -928,7 +929,7 @@ class SuperGraph(object):
         # Use the dictionary to filter the list of edges
         edges = [e for e in edges if marked_edges[e[0]]]
         logging.info(
-            f'---- Only {len(common)} out of {len(s0.nodes)} source nodes ' +
+            f'---- Only {len(common)} out of {len(s0.nodes)} source nodes '
             f'have some edge.')
         logging.info('---- Isolated source nodes will be ignored')
 
@@ -981,7 +982,7 @@ class SuperGraph(object):
         return
 
     def computeSimGraph(self, label, R=None, n_edges=None, n_gnodes=None,
-                        similarity='JS', g=1, th_gauss=0.1, rescale=False,
+                        similarity='He2', g=1, th_gauss=0.1, rescale=False,
                         blocksize=25_000, useGPU=False, tmp_folder=None,
                         save_every=1e300, verbose=True):
         """
@@ -1178,7 +1179,6 @@ class SuperGraph(object):
             self.activate_snode(s_label)
 
         edges, weights = self.snodes[s_label].compute_ppr(th=th)
-        ipdb.set_trace()
 
         # Create new s_node
         if inplace is False:
@@ -1342,9 +1342,8 @@ class SuperGraph(object):
         # Log result
         n_nodes = self.snodes[ylabel].n_nodes
         n_edges = self.snodes[ylabel].n_edges
-        aux = {'lower': 'above', 'upper': 'below'}
         logging.info(f"-- -- Nodes with attribute {att} taking a not allowed "
-                     f"value removed. {ylabel} now has {n_nodes} nodes and " +
+                     f"value removed. {ylabel} now has {n_nodes} nodes and "
                      f"{n_edges} edges")
         return
 
@@ -1387,7 +1386,7 @@ class SuperGraph(object):
         n_nodes = self.snodes[ylabel].n_nodes
         n_edges = self.snodes[ylabel].n_edges
         logging.info(f"-- -- Nodes with value {value} in attribute {att} "
-                     f"removed. {xlabel} now has {n_nodes} nodes " +
+                     f"removed. {xlabel} now has {n_nodes} nodes "
                      f"and {n_edges} edges")
         return
 
@@ -1432,7 +1431,7 @@ class SuperGraph(object):
         n_edges = self.snodes[ylabel].n_edges
         aux = {'lower': 'above', 'upper': 'below'}
         logging.info(f"-- -- Nodes with attribute {att} {aux[bound]} {th} "
-                     f"removed. {ylabel} now has {n_nodes} nodes and " +
+                     f"removed. {ylabel} now has {n_nodes} nodes and "
                      f"{n_edges} edges")
         return
 
@@ -1533,7 +1532,7 @@ class SuperGraph(object):
         ygraph = self.snodes[ylabel]
 
         if ygraph.n_edges > 0:
-            logging.warning(f"-- -- snode {ylabel} contains {ygraph.n_edges}" +
+            logging.warning(f"-- -- snode {ylabel} contains {ygraph.n_edges}"
                             " edges. They will be removed")
 
         # Compute the n-th power of the similarity matrix for graph X
@@ -1554,7 +1553,7 @@ class SuperGraph(object):
 
         if Kxy.shape[0] != Kx.shape[0]:
             logging.error(
-                "The feature vectors and the similarity matrix have " +
+                "The feature vectors and the similarity matrix have "
                 "mismatching dimensions.")
 
         S = Kxy.transpose().dot(Kx.dot(Kxy))
@@ -1592,7 +1591,7 @@ class SuperGraph(object):
                                          'normalize': normalize})
         ygraph.update_metadata()
 
-        logging.info(f"-- -- Transductive graph generated with " +
+        logging.info(f"-- -- Transductive graph generated with "
                      f"{ygraph.n_nodes} nodes and {ygraph.n_edges} edges")
 
         # Update metadata
@@ -1696,12 +1695,12 @@ class SuperGraph(object):
         # Check consistency of the sets of intermediate nodes in both sedges
         if set(m_nodes_0) != set(m_nodes_1):
             logging.error(
-                f'---- Sedges {xmlabel} and {mylabel} have different sets of' +
+                f'---- Sedges {xmlabel} and {mylabel} have different sets of'
                 f'intermediate nodes')
         elif m_nodes_0 != m_nodes_1:
             logging.error(
-                f'---- Intermediate nodes in {xmlabel} and {mylabel} have ' +
-                f'different ordering. Order-independent transitive graphs ' +
+                f'---- Intermediate nodes in {xmlabel} and {mylabel} have '
+                f'different ordering. Order-independent transitive graphs '
                 f'are not available yet')
 
         # ############
@@ -1757,7 +1756,7 @@ class SuperGraph(object):
         # Add new sedge to the supergraph structure
         self.sedges[e_label] = exy
 
-        logging.info(f"---- Transitive graph generated with " +
+        logging.info(f"---- Transitive graph generated with "
                      f"{exy.n_nodes} nodes and {exy.n_edges} edges")
 
         # Update metagraph
@@ -1965,8 +1964,8 @@ class SuperGraph(object):
         Kx = self.snodes[xlabel]._computeK(diag=False)
         Ky = self.snodes[ylabel]._computeK(diag=False)
 
-        score = Kx.multiply(Ky).sum() / (scsp.linalg.norm(Kx) *
-                                         scsp.linalg.norm(Ky) + EPS)
+        score = (Kx.multiply(Ky).sum()
+                 / (scsp.linalg.norm(Kx) * scsp.linalg.norm(Ky) + EPS))
 
         return score
 

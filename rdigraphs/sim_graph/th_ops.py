@@ -235,10 +235,10 @@ class ThOps(object):
             If True, matrix operations are accelerated using GPU
         tmp_folder : str or None, optional (defautl = None)
             Name of the folder to save temporary files
-        save_every : int, optional (default=0)
+        save_every : int, optional (default=1e300)
             Maximum size of the growing lists. The output lists are constructed
-            incrementally. To avooy memory overload, growing lists are saved
-            every time they reach this size limit. The full liests are thus
+            incrementally. To avoid memory overload, growing lists are saved
+            every time they reach this size limit. The full lists are thus
             incrementally saved in files.
             The default value is extremely large, which de facto implies no
             temporary saving.

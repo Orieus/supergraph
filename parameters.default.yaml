@@ -88,6 +88,17 @@ validate_all_models:
   rescale: False
   n_edges_t: 100_000
   g: 1
+  # Average number of edges per node in the graphs used for validation
+  epn: 100 # Average 
+  # Prefix of the names of the reference graphs
+  ref_graph_prefix: RG
+  # Size of the initial set of nodes (only for some databases)
+  # 4-5 times ref_graph_nodes_target is ok.
+  ref_graph_nodes_init: 100000
+  # Target numer of nodes in the reference graph
+  ref_graph_nodes_target: 20000
+  # Target average number of edges per node in the reference graph
+  ref_graph_epn: 100
 
 # Specify format for the log outputs
 logformat:

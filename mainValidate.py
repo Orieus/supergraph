@@ -50,7 +50,7 @@ query_needed = False
 # Create SuperGraph Project
 # paths2data stores the path to all source data that might be needed by the
 # task manager
-paths2data = {'topicmodels': os.path.join(args.source, 'topic_models'),
+paths2data = {'topicmodels': os.path.join(args.source, 'models'),
               'agents': os.path.join(args.source, 'agents'),
               'ACL_models': os.path.join(args.source, 'ACL_models')}
 tm = ValTaskManager(project_path, paths2data)
@@ -63,7 +63,7 @@ tm = ValTaskManager(project_path, paths2data)
 # menu navigator. They may differ from those needed by the task manager
 paths2data = {'graphs': os.path.join(project_path, 'graphs'),
               'bigraphs': os.path.join(project_path, 'bigraphs'),
-              'topicmodels': os.path.join(args.source, 'topic_models'),
+              'topicmodels': os.path.join(args.source, 'models'),
               'agents': os.path.join(args.source, 'agents'),
               'ACL_models': os.path.join(args.source,
                                          'ACL_models/models/tm'),
@@ -75,5 +75,5 @@ path2menu = 'val_menu.yaml'
 # ##############
 
 menu = MenuNavigator(tm, path2menu, paths2data)
-menu.front_page(title="RDI Graph Analyzer")
+menu.front_page(title="Topic model validator")
 menu.navigate(option, active_options)
