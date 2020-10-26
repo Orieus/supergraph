@@ -155,13 +155,13 @@ class DataGraph(object):
             else:
                 # Report data inconsistencies, because they are clues to bugs
                 logging.info(
-                    f'-- -- Graph {label} loaded with {self.n_nodes} nodes ' +
+                    f'-- -- Graph {label} loaded with {self.n_nodes} nodes '
                     f'and {self.n_edges} edges')
                 if self.n_nodes != self.metadata['nodes']['n_nodes']:
-                    logging.warning("-- -- Inconsistent number of nodes in " +
+                    logging.warning("-- -- Inconsistent number of nodes in "
                                     "data and metadata")
                 if self.n_edges != self.metadata['edges']['n_edges']:
-                    logging.warning("-- -- Inconsistent number of edges in " +
+                    logging.warning("-- -- Inconsistent number of edges in "
                                     "data and metadata")
             # Update metadata, fixing inconsistencies, if any
             self.update_metadata()
@@ -214,8 +214,8 @@ class DataGraph(object):
             'n_nodes': self.n_nodes})
 
         self.metadata['edges'].update({
-            'attributes': list(set(self.df_edges.columns) -
-                               {'Source', 'Target', 'Weight'}),
+            'attributes': list(set(self.df_edges.columns)
+                               - {'Source', 'Target', 'Weight'}),
             'n_edges': self.n_edges})
 
         return
@@ -458,8 +458,8 @@ class DataGraph(object):
         # Check if node already exists
         if node in self.nodes:
             logging.warning(
-                f'-- -- DUPLICATION: Node {node} already exists in graph ' +
-                f'{self.label}. Existing node and their edges will be ' +
+                f'-- -- DUPLICATION: Node {node} already exists in graph '
+                f'{self.label}. Existing node and their edges will be '
                 f'removed')
             self.drop_single_node(node)
 
@@ -496,11 +496,11 @@ class DataGraph(object):
         # Check if node already exist
         if source not in self.nodes:
             logging.warning(
-                f'-- -- NODE UNKNOWN: Source node {source} does not exist ' +
+                f'-- -- NODE UNKNOWN: Source node {source} does not exist '
                 f'in graph {self.label}. No action taken')
         elif target not in self.nodes:
             logging.warning(
-                f'-- -- NODE UNKNOWN: Target node {target} does not exist ' +
+                f'-- -- NODE UNKNOWN: Target node {target} does not exist '
                 f'in graph {self.label}. No action taken')
         else:
             # Create graph with the input node
@@ -532,7 +532,7 @@ class DataGraph(object):
 
         # Check if node already exists
         if node not in self.nodes:
-            logging.warning(f'-- -- Node {node} does not exist in graph' +
+            logging.warning(f'-- -- Node {node} does not exist in graph'
                             f'{self.label}. No action taken')
 
         else:
@@ -570,22 +570,22 @@ class DataGraph(object):
         # Check if node already exist
         if source not in self.nodes:
             logging.warning(
-                f'-- -- NODE UNKNOWN: Source node {source} does not exist ' +
+                f'-- -- NODE UNKNOWN: Source node {source} does not exist '
                 f'in graph {self.label}. No action taken')
         elif target not in self.nodes:
             logging.warning(
-                f'-- -- NODE UNKNOWN: Target node {target} does not exist ' +
+                f'-- -- NODE UNKNOWN: Target node {target} does not exist '
                 f'in graph {self.label}. No action taken')
         else:
             # Remove source->target edges
-            self.df_edges = self.df_edges[(self.df_edges.Source != source) |
-                                          (self.df_edges.Target != target)]
+            self.df_edges = self.df_edges[(self.df_edges.Source != source)
+                                          | (self.df_edges.Target != target)]
 
             if not directed:
                 # Remove target->source edges
                 self.df_edges = self.df_edges[
-                    (self.df_edges.Source != target) |
-                    (self.df_edges.Target != source)]
+                    (self.df_edges.Source != target)
+                    | (self.df_edges.Target != source)]
 
             # Recompute self attributes about edges.
             self._df_edges_2_atts()
@@ -690,7 +690,7 @@ class DataGraph(object):
         # Remove from variable nodes the nodes that already exist in the graph
         new_nodes = list(set(nodes) - set(self.nodes))
         if len(new_nodes) < len(nodes):
-            logging.warning("-- -- Some nodes in the input list already " +
+            logging.warning("-- -- Some nodes in the input list already "
                             "exist in the graph.")
 
         # Update dataframe of nodes
@@ -727,7 +727,7 @@ class DataGraph(object):
         if T.shape[0] == self.n_nodes:
             self.T = T
         else:
-            logging.error("-- -- The number of nodes must be equal to the " +
+            logging.error("-- -- The number of nodes must be equal to the "
                           "number of rows in the feature matrix")
 
         return
@@ -960,6 +960,19 @@ class DataGraph(object):
             nodes = []
 
         return nodes
+
+    def get_matrix(self):
+        """
+        Returns the sparse_csr weight matrix for the self graph
+        """
+
+        data = self.weights
+        row, col = zip(*self.edge_ids)
+
+        W = csr_matrix((data, (row, col)),
+                       shape=(self.n_nodes, self.n_nodes))
+
+        return W
 
     # ################
     # Graph processing
@@ -1200,7 +1213,7 @@ class DataGraph(object):
             'neighbors_per_sampled_node': self.n_edges / n_gnodes,
             'density': 2 * self.n_edges / (self.n_nodes * (self.n_nodes - 1))})
 
-        logging.info(f"-- -- Graph generated with {n_gnodes} nodes and " +
+        logging.info(f"-- -- Graph generated with {n_gnodes} nodes and "
                      f"{self.n_edges} edges in {tm} seconds")
 
         return
@@ -1305,7 +1318,7 @@ class DataGraph(object):
         self._df_edges_2_atts()
         self.update_metadata()
 
-        logging.info(f'-- -- {n0-self.n_nodes} isolated nodes removed from ' +
+        logging.info(f'-- -- {n0-self.n_nodes} isolated nodes removed from '
                      f'graph {self.label}')
 
         return
@@ -1344,8 +1357,8 @@ class DataGraph(object):
         # Local graph analysis algorithms
 
         # Apply the clustering algorithm
-        if (not hasattr(self, 'edge_class') or
-                self.edge_class == 'undirected'):
+        if (not hasattr(self, 'edge_class')
+                or self.edge_class == 'undirected'):
             G = nx.from_scipy_sparse_matrix(D)
         else:
             G = nx.from_scipy_sparse_matrix(D, create_using=nx.DiGraph())
@@ -1368,7 +1381,6 @@ class DataGraph(object):
                         if C[i] > th]
 
         new_edges, new_weights = zip(*new_out)
-        n_edges = len(self.edge_ids)
 
         # Create pandas structures for edges.
         # Each node is a project, indexed by field REFERENCIA.
@@ -1428,8 +1440,8 @@ class DataGraph(object):
         self.metadata['local_features'].update({name: self.lg_report})
         self.metadata['local_features'][name].update({'time': tm})
 
-        logging.info(f"-- -- {sg.n_clusters} equivalence classes computed " +
-                     f"in {tm} seconds")
+        logging.info(f"-- -- {sg.n_clusters} equivalence classes computed in "
+                     f"{tm} seconds")
 
         return sg.cluster_ids, sg.Xeq
 
@@ -1459,7 +1471,7 @@ class DataGraph(object):
 
         # Check if the label name is allowed
         if self.n_nodes > 0 and label in list(self.df_nodes):
-            logging.warning(f"The label name {label} has been used. " +
+            logging.warning(f"The label name {label} has been used. "
                             f"Existing data will be removed")
 
         # Parameters
@@ -1497,7 +1509,6 @@ class DataGraph(object):
         # ########################
         # Store model in dataframe
         self.add_attributes(label, self.cluster_labels)
-        Ids = range(self.nc[label])
 
         # ###############
         # Update metadata
@@ -1554,7 +1565,7 @@ class DataGraph(object):
                                         remove_none=False)
 
         # Print results
-        logging.info(f'-- -- The value of {method.upper()} between ' +
+        logging.info(f'-- -- The value of {method.upper()} between '
                      f'communities is {d}')
 
         return
@@ -1601,8 +1612,8 @@ class DataGraph(object):
                          'pageRank', 'cluster_coef', 'katz', 'abs_in_degree',
                          'abs_out_degree']:
 
-            if (not hasattr(self, 'edge_class') or
-                    self.edge_class == 'undirected'):
+            if (not hasattr(self, 'edge_class')
+                    or self.edge_class == 'undirected'):
                 G = nx.from_scipy_sparse_matrix(D)
             else:
                 G = nx.from_scipy_sparse_matrix(D, create_using=nx.DiGraph())
@@ -1675,8 +1686,8 @@ class DataGraph(object):
 
         else:
 
-            logging.info(f"-- Parameter {parameter} not available. No " +
-                         "action taken")
+            logging.info(f"-- Parameter {parameter} not available. No action "
+                         "taken")
 
         return
 
@@ -1855,7 +1866,7 @@ class DataGraph(object):
                 # This should never happen, but it is checked to avoid
                 # catastrofic errors
                 logging.error(
-                    "-- -- Mismatch error: the number of nodes in metadata " +
+                    "-- -- Mismatch error: the number of nodes in metadata "
                     "is not equal to the length of the node list")
                 exit()
 
@@ -1869,7 +1880,7 @@ class DataGraph(object):
                     # This should never happen, but it is checked to avoid
                     # catastrofic errors
                     logging.error(
-                        "-- -- Mismatch error: the number of edges in " +
+                        "-- -- Mismatch error: the number of edges in "
                         "metadata is not equal to the length of the edge list")
                     exit()
 
