@@ -837,7 +837,8 @@ class Validator(object):
             dt = time.time() - t0
 
             # Compute connected components
-            self.SG.snodes[model].detect_cc(label='cc')
+            # self.SG.snodes[model].detect_cc(label='cc')
+            self.SG.detectCommunities(model, alg='cc', comm_label='cc')
 
             # Get output parameters
             md = self.SG.snodes[model].metadata

@@ -1,1 +1,0 @@
-/Users/jcid/Google Drive UC3M/PTL_Grafos2018/git_PTL_Grafos/PTL_RDIgraphs/sphinx_settings/rdigraphs_datamanager.rst
