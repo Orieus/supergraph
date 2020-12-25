@@ -1020,6 +1020,7 @@ class Validator(object):
                     th_50 = max(th_50, np.percentile(Wj.data, 50))
                     th_80 = max(th_80, np.percentile(Wj.data, 80))
                     th_90 = max(th_90, np.percentile(Wj.data, 90))
+                    # Compute the component-wise minimum of all Wj
                     Wi = Wi.minimum(Wj)
                 self.SG.deactivate_snode(model)
 
