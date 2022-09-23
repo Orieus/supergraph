@@ -25,7 +25,11 @@ matplotlib.use("Agg")
 import seaborn as sns
 
 # Graph layout
-from fa2 import ForceAtlas2   # "pip install fa2"
+try:
+    from fa2 import ForceAtlas2   # "pip install fa2"
+except:
+    print("WARNING: fa2 could not be imported."
+          "Force-atlas layout not available")
 
 # Local imports
 from rdigraphs.sim_graph.sim_graph import SimGraph

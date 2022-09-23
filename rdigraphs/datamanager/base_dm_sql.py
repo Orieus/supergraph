@@ -14,7 +14,7 @@ Created on May 11 2018
 from __future__ import print_function    # For python 2 copmatibility
 import os
 import pandas as pd
-import MySQLdb
+import MySQLdb     # conda install mysqlclient
 import sqlite3
 import numpy as np
 import copy

@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import colorama
 
-from neo4j.v1 import GraphDatabase
+from neo4j import GraphDatabase
 
 # Local Imports
 from . import cypher
