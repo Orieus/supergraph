@@ -12,8 +12,8 @@ import copy
 
 from time import time
 
-from scipy.sparse import csr_matrix, identity, save_npz, load_npz
-# This is not being used, because it is quit slow
+from scipy.sparse import csr_matrix, identity, save_npz, load_npz, issparse
+# This is not being used, because it is quite slow
 # from scipy.stats import entropy
 
 # For community detection algorithms
@@ -1902,7 +1902,10 @@ class DataGraph(object):
 
         # Save equivalent feature matrix
         if self.T is not None:
-            save_npz(self.path2T, self.T)
+            if issparse(self.T):
+                save_npz(self.path2T, self.T)
+            else:
+                np.savez(self.path2T, T=self.T)
 
         return
 

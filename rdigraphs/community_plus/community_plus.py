@@ -12,8 +12,16 @@ from sklearn.cluster import spectral_clustering
 # # For community detection algorithms
 import networkx as nx
 import community      # "install python-louvain"
-import igraph         # "install -c conda-forge python-igraph"
-import leidenalg      # "install -c conda-forge leidenalg"
+
+try:
+    import leidenalg      # "install -c conda-forge leidenalg"
+except:
+    print("WARNING: leidenalg import error. Some methods will fail")
+
+try:
+    import igraph         # "install -c conda-forge python-igraph"
+except:
+    print("WARNING: igraph import error. Some methods will fail")
 
 
 class CommunityPlus(object):

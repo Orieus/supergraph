@@ -1,21 +1,56 @@
-# for accessing the DBs
+
+
+# Path to Halo software
+path2halo: '../myhalo'
+
+# Parameters for algorithms
+algorithms:
+  # Size of blocks for the computation of similarity graphs. 25_000 is ok for
+  # computation in a standard PC. Larger values may cause large processing
+  # times caused by memory swapping.
+  blocksize: 25_000  
+  # If True, cupy library will be used to carry out some matrix multiplications
+  useGPU: False
+  # If True, affinities for similairty graphs are computed from distances by
+  # rescaling values so that the minimum is zero and maximum is 1.
+  rescale: False
+
+# Parameters for model validation
+validate_all_models:
+  spf: 1       # Sampling factor
+  rescale: False
+  n_edges_t: 100_000
+  g: 1
+  # Average number of edges per node in the graphs used for validation
+  epn: 100 # Average 
+  # Prefix of the names of the reference graphs
+  ref_graph_prefix: RG
+  # Size of the initial set of nodes (only for some databases)
+  # 4-5 times ref_graph_nodes_target is ok.
+  ref_graph_nodes_init: 100000
+  # Target numer of nodes in the reference graph
+  ref_graph_nodes_target: 20000
+  # Target average number of edges per node in the reference graph
+  ref_graph_epn: 100
+
+# SQL and Graph DataBases
 connections:
   SQL:
     # Select one and only one db for Pr, Pu and Pa.
     db_selection:
-      Pr: db_Pr_FECYT
-      Pa: db_Pa_PATSTATS
-      Pu: db_Pu_S24Ever    # publicacionesScopus
-      Co: db_Crunch4Ever
+      # Pr: db_Pr_FECYT
+      # Pa: db_Pa_PATSTATS
+      # Pu: db_Pu_S24Ever    # publicacionesScopus
+      # Co: db_Crunch4Ever
     databases:
       # name of the DB as specified when opening the connection
       db_Pr_FECYT:
         # the "&"s allow referring to ("dereferencing") the corresponding field below (using "*")
         category: Pr
         connector: &sql_con mysql
-        server: &sql_server vanir.tsc.uc3m.es
-        user: &sql_user PTLprojects
-        password: &sql_password Kts93_u17a
+        server: &sql_server hal01.tsc.uc3m.es  # Write your server address here
+        user: &sql_user PTLprojects            # Write your server address here
+        password: &sql_password ############   # Write password here
       # ----
       db_Crunch4Ever:
         category: Pu
@@ -62,43 +97,10 @@ connections:
         password: *sql_password
         port: None,
         unix_socket: '/var/run/mysqld/mysqld.sock'
-  neo4j:
-    server: bolt://hator03:7687
-    user: neo4j
-    password: wapwap
-
-# Path to Halo software
-path2halo: '../myhalo'
-
-# Parameters for algorithms
-algorithms:
-  # Size of blocks for the computation of similarity graphs. 25_000 is ok for
-  # computation in a standard PC. Larger values may cause large processing
-  # times caused by memory swapping.
-  blocksize: 25_000  
-  # If True, cupy library will be used to carry out some matrix multiplications
-  useGPU: False
-  # If True, affinities for similairty graphs are computed from distances by
-  # rescaling values so that the minimum is zero and maximum is 1.
-  rescale: False
-
-# Parameters for model validation
-validate_all_models:
-  spf: 1       # Sampling factor
-  rescale: False
-  n_edges_t: 100_000
-  g: 1
-  # Average number of edges per node in the graphs used for validation
-  epn: 100 # Average 
-  # Prefix of the names of the reference graphs
-  ref_graph_prefix: RG
-  # Size of the initial set of nodes (only for some databases)
-  # 4-5 times ref_graph_nodes_target is ok.
-  ref_graph_nodes_init: 100000
-  # Target numer of nodes in the reference graph
-  ref_graph_nodes_target: 20000
-  # Target average number of edges per node in the reference graph
-  ref_graph_epn: 100
+  # neo4j:
+  #   server: bolt://machine05:1234   # Write your server address here
+  #   user: neo4j                     # Write your user here
+  #   password: ###############       # Write password here
 
 # Specify format for the log outputs
 logformat:

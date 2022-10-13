@@ -7,15 +7,14 @@
 root:
   # type: branch
   options: 
-    # - create   <I simply remove these two options becasue the appropriate one
-    # - load      has been selected by the starting command> 
+    # - create   <I simply remove these two options becasue the appropriate one
+    # - load      has been selected by the starting command> 
     - setup
-    - showSDBdata
-    - manage_Neo4J
+    - import_data
+    - manage_databases
     - graph_previews
     - reset_snode
     - reset_sedge
-    - import_data
     - graph_tools
     - gInference
     - local_graph_analysis
@@ -48,6 +47,10 @@ root:
 #     - option
 #     - option
 
+# #############################################################################
+# LEVEL 1: 
+# #############################################################################
+
 # ##########################
 # OPTIONS FROM THE ROOT MENU
 create: 
@@ -64,21 +67,22 @@ setup:
 readData: 
   title: Read dataset
 
-showSDBdata:
-  title: Show SQL data sources
+import_data:
+  title: Import data
   options:
-    - parameters:
-        Pu: Publications
-        Pr: Projects
-        Pa: Patents
+    - import_snode_from_table
+    - import_nodes_and_model
+    - import_co_citations_graph
+    - import_SCOPUS_citations_graph
+    - import_SCOPUS_citations_subgraph
+    - import_node_atts
+    - import_agents
 
-manage_Neo4J:
-  title: Manage Neo4J database
+manage_databases:
+  title: Manage SQL or Neo4J databases
   options:
-    - showGDBdata
-    - resetGDB
-    - export_graph
-    - export_bigraph
+    - showSDBdata
+    - manage_Neo4J
 
 graph_previews:
   title: Pre-visualize supergraph
@@ -88,24 +92,14 @@ graph_previews:
     - show_sedge
 
 reset_snode:
-  title: Reset supernode
+  title: Reset graph (supernode)
   options:
     - path: graphs 
 
 reset_sedge:
-  title: Reset superedge
+  title: Reset bigraph (superedge)
   options:
     - path: bigraphs
-
-import_data:
-  title: Import data
-  options:
-    - import_nodes_and_model
-    - import_co_citations_graph
-    - import_SCOPUS_citations_graph
-    - import_SCOPUS_citations_subgraph
-    - import_node_atts
-    - import_agents
 
 graph_tools:
   title: Graph tools
@@ -127,7 +121,7 @@ gInference:
     - inferBGfromA
     - transduce
     - inferTransit
-    # - inferSimBG
+    # - inferSimBG
 
 detectCommunities:
   title: Community detection tools
@@ -191,98 +185,18 @@ display_graphs:
     - graph_layout
     - display_bigraph
 
-# #######################
-# Options for showGDBdata
-show_Neo4J:
-  title: Overview of the whole graph databases
-
-show_Neo4J_snode:
-  title: Show information about a specific snode
-  options:
-    - get_method: get_Neo4J_snodes
-
-show_Neo4J_sedge:
-  title: Show information about a specific sedge
-  options:
-    - get_method: get_Neo4J_sedges
-
-# ########################
-# Options for manage_Neo4J
-
-showGDBdata:
-  title: Show Neo4J Super Graph
-  options:
-    - show_Neo4J
-    - show_Neo4J_snode
-    - show_Neo4J_sedge
-
-resetGDB:
-  title: Reset Neo4J Graphs
-  options:
-    - reset_Neo4J
-    - reset_Neo4J_snode
-    - reset_Neo4J_sedge
-
-export_graph:
-  title: Export graphs to Neo4J
-  options:
-    - path: graphs
-    - parameters:
-        Pr: Project
-        Pu: Publication
-        Pa: Patent
-        AU: Author
-        Org: Organization
-
-export_bigraph:
-  title: Export bigraph to Neo4J
-  options:
-    - path: bigraphs
-    - parameters:
-        Pr: Project
-        Pu: Publication
-        Pa: Patent
-        AU: Author
-        Org: Organization
-    - parameters:
-        Pr: Project
-        Pu: Publication
-        Pa: Patent
-        AU: Author
-        Org: Organization
-
-# ##########################
-# Options for graph previews
-show_SuperGraph:
-  title: Show supergraph structure
-
-show_snode:
-  title: Quick preview of graph
-  options:
-    - path: graphs
-
-show_sedge:
-  title: Quick preview of bipartite graph 
-  options:
-    - path: bigraphs
+# #############################################################################
+# LEVEL 2
+# #############################################################################
 
 # #######################
-# Options for resetGDBdata
-reset_Neo4J:
-  title: Reset the whole Neo4J graph databases
+# Options for import_data
 
-reset_Neo4J_snode:
-  title: Reset a specific Neo4J snode
+import_snode_from_table:
+  title: Import nodes and edges from table files
   options:
-    - get_method: get_Neo4J_snodes
+    - get_method: get_names_of_dataset_tables
 
-reset_Neo4J_sedge:
-  title: Reset a specific Neo4J sedge
-  options:
-    - get_method: get_Neo4J_sedges
-
-# ######################
-# Options for load_graps
 import_nodes_and_model:
   title: Import nodes and feature_matrix into a zero-edge graph
   options:
@@ -315,7 +229,7 @@ import_node_atts:
         Pu: Publications
         Pr: Projects
         Pa: Patents
-    - get_method: get_table_names
+    - get_method: get_sql_table_names
     - get_method: get_table_atts
     - get_method: get_table_atts
 
@@ -324,6 +238,40 @@ import_agents:
   options:
     - path: agents
     - path: graphs
+
+# ############################
+# Options for manage_databases
+
+showSDBdata:
+  title: Show SQL data sources
+  options:
+    - parameters:
+        Pu: Publications
+        Pr: Projects
+        Pa: Patents
+
+manage_Neo4J:
+  title: Manage Neo4J database
+  options:
+    - showGDBdata
+    - resetGDB
+    - export_graph
+    - export_bigraph
+
+# ##########################
+# Options for graph previews
+show_SuperGraph:
+  title: Show supergraph structure
+
+show_snode:
+  title: Quick preview of graph
+  options:
+    - path: graphs
+
+show_sedge:
+  title: Quick preview of bipartite graph 
+  options:
+    - path: bigraphs
 
 # #######################
 # Options for graph_tools
@@ -420,7 +368,7 @@ transduce:
         1: "First-order graph (for transduced similarity graphs)"
         0: "Zero-order graph (for cooperation graphs)"
 
-# inferSimBG:
+# inferSimBG:
 #   title: 'Similarity bipartite Graph:      from A_X, B_Y to A-B'
 
 inferTransit:
@@ -430,8 +378,8 @@ inferTransit:
     - path: bigraphs
 
 
-# ################################
-# Optionas for graph visualization
+# ###########################
+# Optionas for display_graphs
 
 graph_layout: 
   title: Graph layout
@@ -452,3 +400,87 @@ show_top_nodes:
   options:
     - path: graphs
     - get_method: get_local_features
+
+# #############################################################################
+# LEVEL 3
+# #############################################################################
+
+# ########################
+# Options for manage_Neo4J
+
+showGDBdata:
+  title: Show Neo4J Super Graph
+  options:
+    - show_Neo4J
+    - show_Neo4J_snode
+    - show_Neo4J_sedge
+
+resetGDB:
+  title: Reset Neo4J Graphs
+  options:
+    - reset_Neo4J
+    - reset_Neo4J_snode
+    - reset_Neo4J_sedge
+
+export_graph:
+  title: Export graphs to Neo4J
+  options:
+    - path: graphs
+    - parameters:
+        Pr: Project
+        Pu: Publication
+        Pa: Patent
+        AU: Author
+        Org: Organization
+
+export_bigraph:
+  title: Export bigraph to Neo4J
+  options:
+    - path: bigraphs
+    - parameters:
+        Pr: Project
+        Pu: Publication
+        Pa: Patent
+        AU: Author
+        Org: Organization
+    - parameters:
+        Pr: Project
+        Pu: Publication
+        Pa: Patent
+        AU: Author
+        Org: Organization
+
+# #######################
+# Options for resetGDBdata
+reset_Neo4J:
+  title: Reset the whole Neo4J graph databases
+
+reset_Neo4J_snode:
+  title: Reset a specific Neo4J snode
+  options:
+    - get_method: get_Neo4J_snodes
+
+reset_Neo4J_sedge:
+  title: Reset a specific Neo4J sedge
+  options:
+    - get_method: get_Neo4J_sedges
+
+# #############################################################################
+# LEVEL 4
+# #############################################################################
+
+# ########################
+# Options for showGDBdata
+show_Neo4J:
+  title: Overview of the whole graph databases
+
+show_Neo4J_snode:
+  title: Show information about a specific snode
+  options:
+    - get_method: get_Neo4J_snodes
+
+show_Neo4J_sedge:
+  title: Show information about a specific sedge
+  options:
+    - get_method: get_Neo4J_sedges
+
