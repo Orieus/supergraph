@@ -1,5 +1,3 @@
-
-
 # Path to Halo software
 path2halo: '../myhalo'
 
@@ -38,7 +36,7 @@ connections:
   SQL:
     # Select one and only one db for Pr, Pu and Pa.
     db_selection:
-      # Pr: db_Pr_FECYT
+      Pr: db_Pr_FECYT
       # Pa: db_Pa_PATSTATS
       # Pu: db_Pu_S24Ever    # publicacionesScopus
       # Co: db_Crunch4Ever
@@ -49,8 +47,8 @@ connections:
         category: Pr
         connector: &sql_con mysql
         server: &sql_server hal01.tsc.uc3m.es  # Write your server address here
-        user: &sql_user PTLprojects            # Write your server address here
-        password: &sql_password ############   # Write password here
+        user: &sql_user username                  # Write username here
+        password: &sql_password xxxxxxxx          # Write password here
       # ----
       db_Crunch4Ever:
         category: Pu
@@ -97,10 +95,10 @@ connections:
         password: *sql_password
         port: None,
         unix_socket: '/var/run/mysqld/mysqld.sock'
-  # neo4j:
-  #   server: bolt://machine05:1234   # Write your server address here
-  #   user: neo4j                     # Write your user here
-  #   password: ###############       # Write password here
+  neo4j:
+    server: xxxxxxx     # Write server here
+    user: neo4j         # Write username here
+    password: xxxxxx    # Write password here
 
 # Specify format for the log outputs
 logformat:
