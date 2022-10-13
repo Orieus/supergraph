@@ -4,18 +4,18 @@ connections:
     # Select one and only one db for Pr, Pu and Pa.
     db_selection:
       Pr: db_Pr_FECYT
-      Pa: db_Pa_PATSTATS
-      Pu: db_Pu_S24Ever    # publicacionesScopus
-      Co: db_Crunch4Ever
+      # Pa: db_Pa_PATSTATS
+      # Pu: db_Pu_S24Ever    # publicacionesScopus
+      # Co: db_Crunch4Ever
     databases:
       # name of the DB as specified when opening the connection
       db_Pr_FECYT:
         # the "&"s allow referring to ("dereferencing") the corresponding field below (using "*")
         category: Pr
         connector: &sql_con mysql
-        server: &sql_server vanir.tsc.uc3m.es
-        user: &sql_user PTLprojects
-        password: &sql_password Kts93_u17a
+        server: &sql_server xxxx.uc3m.es          # Write server addres
+        user: &sql_user username                  # Write username here
+        password: &sql_password xxxxxxxx          # Write password here
       # ----
       db_Crunch4Ever:
         category: Pu
@@ -63,9 +63,9 @@ connections:
         port: None,
         unix_socket: '/var/run/mysqld/mysqld.sock'
   neo4j:
-    server: bolt://hator03:7687
-    user: neo4j
-    password: wapwap
+    server: xxxxxxx     # Write server here
+    user: neo4j         # Write username here
+    password: xxxxxx    # Write password here
 
 # Path to Halo software
 path2halo: '../myhalo'

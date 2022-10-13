@@ -1,9 +1,10 @@
 import logging
 
+import pathlib
 import os
 import shutil
 import _pickle as pickle
-
+import numpy as np
 import yaml    # Conda install pyyaml
 
 import pandas as pd
@@ -35,7 +36,7 @@ class SgTaskManager(object):
     'configReady' : If True, config file loaded. Datamanager activated.
     """
 
-    def __init__(self, path2project, paths2data={},
+    def __init__(self, path2project, paths2data={}, path2source=None,
                  metadata_fname='metadata.pkl',
                  config_fname='parameters.yaml', keep_active=False):
         """
@@ -57,13 +58,14 @@ class SgTaskManager(object):
         """
 
         # This is the minimal information required to start with a project
-        self.path2project = os.path.normpath(path2project)
-        self.path2metadata = os.path.join(self.path2project, metadata_fname)
-        self.path2config = os.path.join(self.path2project, config_fname)
+        self.path2project = pathlib.Path(path2project)
+        self.path2metadata = self.path2project / metadata_fname
+        self.path2config = self.path2project / config_fname
         self.metadata_fname = metadata_fname
         self.path2halo = None    # Path to Halo software
 
         # This may be required by some methods
+        self.path2source = path2source
         if 'topicmodels' in paths2data:
             self.path2tm = paths2data['topicmodels']
         if 'agents' in paths2data:
@@ -117,7 +119,7 @@ class SgTaskManager(object):
 
         return
 
-    def request_confirmation(self, msg="     Are you sure?"):
+    def _request_confirmation(self, msg="     Are you sure?"):
         """
         Requests a confirmation from user
 
@@ -161,13 +163,12 @@ class SgTaskManager(object):
         p2p = self.path2project
 
         # Check and clean project folder location
-        if os.path.exists(p2p):
+        if p2p.is_dir():
             print('Folder {} already exists.'.format(p2p))
 
             # Remove current backup folder, if it exists
-            # old_p2p = removeSlash(p2p) + '_old/'
-            old_p2p = os.path.normpath(p2p) + '_old'
-            if os.path.exists(old_p2p):
+            old_p2p = pathlib.Path(p2p + '_old')
+            if old_p2p.is_dir():
                 shutil.rmtree(old_p2p)
 
             # Copy current project folder to the backup folder.
@@ -175,7 +176,8 @@ class SgTaskManager(object):
             print('Moved to ' + old_p2p)
 
         # Create project folder and subfolders
-        os.makedirs(self.path2project)
+        # os.makedirs(self.path2project)
+        self.path2project.mkdir()
 
         self.update_folders(f_struct)
 
@@ -194,9 +196,9 @@ class SgTaskManager(object):
         self.ready2setup = True
 
         # Create empty supergraph
-        p = os.path.join(self.path2project, self.f_struct['metagraph'])
-        p2sn = os.path.join(self.path2project, self.f_struct['snodes'])
-        p2se = os.path.join(self.path2project, self.f_struct['sedges'])
+        p = self.path2project / self.f_struct['metagraph']
+        p2sn = self.path2project / self.f_struct['snodes']
+        p2se = self.path2project / self.f_struct['sedges']
         self.SG = SuperGraph(path=p, path2snodes=p2sn, path2sedges=p2se)
 
         return
@@ -235,9 +237,9 @@ class SgTaskManager(object):
         main_folders = ['import', 'export', 'output', 'snodes', 'sedges',
                         'metagraph']
         for d in main_folders:
-            path2d = os.path.join(p2p, self.f_struct[d])
-            if not os.path.exists(path2d):
-                os.makedirs(path2d)
+            path2d = p2p / self.f_struct[d]
+            if not path2d.exists():
+                path2d.mkdir()
 
         # Import subfolders
         # Use this type of code to create subfolders
@@ -285,12 +287,12 @@ class SgTaskManager(object):
         # once the project folder is stablished.
 
         # Check and clean project folder location
-        if not os.path.exists(self.path2project):
+        if not self.path2project.exists():
             print(f'-- Folder {self.path2project} does not exist. '
                   'You must create the project first')
 
         # Check metadata file
-        elif not os.path.exists(self.path2metadata):
+        elif not self.path2metadata.exists():
             print(
                 f'-- ERROR: Metadata file {self.path2metadata} does not'
                 '   exist.\n'
@@ -326,9 +328,9 @@ class SgTaskManager(object):
                     'Revise the configuration file and activate it.')
 
             # Load supergraph
-            p = os.path.join(self.path2project, self.f_struct['metagraph'])
-            p2sn = os.path.join(self.path2project, self.f_struct['snodes'])
-            p2se = os.path.join(self.path2project, self.f_struct['sedges'])
+            p = self.path2project / self.f_struct['metagraph']
+            p2sn = self.path2project / self.f_struct['snodes']
+            p2se = self.path2project / self.f_struct['sedges']
             self.SG = SuperGraph(path=p, path2snodes=p2sn, path2sedges=p2se)
 
         return
@@ -341,7 +343,7 @@ class SgTaskManager(object):
         # Log to file and console
 
         p = self.global_parameters['logformat']
-        fpath = os.path.join(self.path2project, p['filename'])
+        fpath = self.path2project / p['filename']
 
         logging.basicConfig(
             filename=fpath, format=p['file_format'],
@@ -384,7 +386,8 @@ class SgTaskManager(object):
         self.set_logs()
 
         db_params = self.global_parameters['connections']
-        self.DM = DataManager(self.path2project, db_params)
+        self.DM = DataManager(self.path2project, db_params,
+                              path2source=self.path2source)
 
         self.state['dbReady'] = self.DM.dbON
 
@@ -431,7 +434,14 @@ class SgTaskManager(object):
     # ##################################
     # Get methods for the menu navigator
     # ##################################
-    def get_table_names(self, graph, db):
+    def get_names_of_dataset_tables(self):
+        """
+        Returns the list of available tables with raw graph data
+        """
+
+        return self.DM.get_names_of_dataset_tables()
+
+    def get_sql_table_names(self, graph, db):
         """
         Get tables in the given database
 
@@ -654,14 +664,14 @@ class SgTaskManager(object):
         """
 
         graphs_w_features = []
-        path2snodes = os.path.join(self.path2project, self.f_struct['snodes'])
+        path2snodes = self.path2project / self.f_struct['snodes']
 
         # Show snode attrtibutes
         print("\n-- Graph attributes:")
         for label in self.SG.metagraph.nodes:
 
             # Create graph object
-            path = os.path.join(path2snodes, label)
+            path = path2snodes / label
             snode = DataGraph(label=label, path=path, load_data=False)
             if snode.has_saved_features():
                 graphs_w_features.append(label)
@@ -813,9 +823,9 @@ class SgTaskManager(object):
         """
 
         breakpoint()
-        print("---- This will reset the entire database. All data will " +
-              "be lost.")
-        if self.request_confirmation():
+        print("---- This will reset the entire database. All data will be "
+              "lost.")
+        if self._request_confirmation():
             self.DM.Neo4j.resetDB()
             logging.info("---- Graph database have been reset")
         else:
@@ -835,7 +845,7 @@ class SgTaskManager(object):
 
         print("---- WARNING: This will reset the snode from the database.")
         breakpoint()
-        if self.request_confirmation():
+        if self._request_confirmation():
             self.DM.Neo4j.dropNodes(snode)
             logging.info("---- Nodes of type {snode} have been reset.")
         else:
@@ -855,7 +865,7 @@ class SgTaskManager(object):
 
         print("---- WARNING: This will reset the sedge from the database.")
         breakpoint()
-        if self.request_confirmation():
+        if self._request_confirmation():
             self.DM.Neo4j.drop_relationship(sedge)
             logging.info("---- Edges of type {sedge} have been reset.")
         else:
@@ -908,131 +918,72 @@ class SgTaskManager(object):
 
         return
 
-    # ##############################
-    # Supergraph reading and edition
-    # ##############################
-    def show_SuperGraph(self):
-        """
-        Show current supergraph structure
-        """
-
-        # Show supegraph structure of snodes and sedges
-        print("-- Graphs:")
-        print(self.SG.metagraph.df_nodes)
-        print("\n-- Bigraphs:")
-        print(self.SG.metagraph.df_edges)
-
-        # Change log level to avoid cumbersome messages
-        logging.getLogger().setLevel(logging.ERROR)
-
-        # Show snode attributes
-        print("\n-- Graph attributes:")
-        for label in self.SG.metagraph.nodes:
-            # Create graph object
-            atts = self.SG.get_attributes(label)
-            print(f"-- -- {label}: {', '.join(atts)}")
-
-        # Show graph (snode) dimensions
-        print("\n-- Graph dimensions:")
-        gd = {'Graph': [], 'n_nodes': [], 'n_edges': []}
-        for label in self.SG.metagraph.nodes:
-            metadata = self.SG.get_metadata(label)
-            gd['Graph'].append(label)
-            gd['n_nodes'].append(metadata['nodes']['n_nodes'])
-            gd['n_edges'].append(metadata['edges']['n_edges'])
-        snode_md = pd.DataFrame(gd)
-        print(snode_md)
-
-        # Show bigraph (sedge) dimensions
-        print("\n-- Bigraph dimensions:")
-        gd = {'Bigraph': [], 'n_source': [], 'n_target': [],
-              'n_edges': []}
-        if 'label' in self.SG.metagraph.df_edges:
-            for label in self.SG.metagraph.df_edges['label']:
-                metadata = self.SG.get_metadata(label, is_node_name=False)
-                gd['Bigraph'].append(label)
-                gd['n_source'].append(metadata['nodes']['n_source'])
-                gd['n_target'].append(metadata['nodes']['n_target'])
-                gd['n_edges'].append(metadata['edges']['n_edges'])
-            sedge_md = pd.DataFrame(gd)
-            print(sedge_md)
-
-        # Restore logging mode
-        old_level = self.global_parameters['logformat']['cons_level']
-        logging.getLogger().setLevel(old_level)
-
-        return
-
-    def show_snode(self, path2snode):
-        """
-        A quick preview of a supernode.
-
-        Parameters
-        ----------
-        path2snode : str
-            Path to the supernode
-        """
-
-        label = path2snode.split(os.path.sep)[-1]
-        self.SG.activate_snode(label)
-        self.SG.snodes[label].pprint(10)
-        self._deactivate()
-
-        return
-
-    def show_sedge(self, path2sedge):
-        """
-        A quick preview of a superedge.
-
-        Parameters
-        ----------
-        path2sedge : str
-            Path to the superedge
-        """
-
-        label = path2sedge.split(os.path.sep)[-1]
-        self.SG.activate_sedge(label)
-        self.SG.sedges[label].pprint()
-        self._deactivate()
-
-        return
-
-    def reset_snode(self, path):
-        """
-        Reset snode in path
-
-        Parameters
-        ----------
-        path : str
-            Path to snode
-        """
-
-        label = path.split(os.path.sep)[-1]
-        self.SG.drop_snode(label)
-        logging.info(f'---- Graph {label} has been removed.')
-
-        return
-
-    def reset_sedge(self, path):
-        """
-        Reset sedge in path
-
-        Parameters
-        ----------
-        path : str
-            Path to sedge
-        """
-
-        label = path.split(os.path.sep)[-1]
-        self.SG.drop_sedge(label)
-
-        logging.info(f'---- Bigraph {label} has been removed.')
-
-        return
-
     # ###########
     # Load graphs
     # ###########
+    def import_snode_from_table(self, table_name):
+        """
+
+        """
+
+        # #######################
+        # REQUEST NUMBER OF NODES
+
+        # Number of nodes.
+        # If 0, all nodes are used
+        # If 0 < n_nodes < 1, this is the fraction of the total
+        # If n_nodes > 1, number of nodes
+        n0_default = 0
+        n0 = float(input(f"Select number of nodes [0=all]: ") or n0_default)
+
+        # #########
+        # LOAD DATA
+
+        # Take the path to the data from the config file, if possible
+        # path = self.global_parameters['source_data'][corpus]
+        logging.info(f'-- Loading dataset {table_name}')
+
+        df_nodes = self.DM.import_graph_data_from_tables(
+            table_name, sampling_factor=0.1)
+
+        breakpoint()
+
+        # Take feature matrix from embeddings
+        T = np.array(df_nodes['embeddings'].tolist())
+
+        # Remove embeddings from df_nodes
+        df_nodes.drop(columns='embeddings', inplace=True)
+
+        nodes = df_nodes['id'].tolist()
+
+        # Take a random sample
+        if n0 <= 0:
+            n_gnodes = len(nodes)
+        elif n0 < 1:
+            n_gnodes = int(n0 * len(nodes))
+        else:
+            n_gnodes = int(n0)
+
+        # ########################
+        # LOAD DATA INTO NEW SNODE
+
+        # Create datagraph with the full feature matrix
+        self.SG.makeSuperNode(label=table_name, nodes=nodes, T=T, save_T=True)
+        self.SG.sub_snode(table_name, n_gnodes, ylabel=table_name,
+                          sampleT=True, save_T=True)
+
+        # #####################
+        # SHOW AND SAVE RESULTS
+
+        logging.info(f'Zero-edge graph loaded with {n_gnodes} nodes')
+        # Save graph: nodes and edges
+        self.SG.save_supergraph()
+
+        # Reset snode. This is to save memory.
+        self._deactivate()
+
+        return
+
     def import_nodes_and_model(self, path):
         """
         This method manages the generation of similarity (semantic)
@@ -1042,8 +993,6 @@ class SgTaskManager(object):
         ----------
         path : str
             Path to the model
-        sim : str
-            Similarity measure
         """
 
         # Name of the selected corpus topic model
@@ -1381,6 +1330,128 @@ class SgTaskManager(object):
 
         return
 
+    # ##############################
+    # Supergraph reading and edition
+    # ##############################
+    def show_SuperGraph(self):
+        """
+        Show current supergraph structure
+        """
+
+        # Show supegraph structure of snodes and sedges
+        print("-- Graphs:")
+        print(self.SG.metagraph.df_nodes)
+        print("\n-- Bigraphs:")
+        print(self.SG.metagraph.df_edges)
+
+        # Change log level to avoid cumbersome messages
+        logging.getLogger().setLevel(logging.ERROR)
+
+        # Show snode attributes
+        print("\n-- Graph attributes:")
+        for label in self.SG.metagraph.nodes:
+            # Create graph object
+            atts = self.SG.get_attributes(label)
+            print(f"-- -- {label}: {', '.join(atts)}")
+
+        # Show graph (snode) dimensions
+        print("\n-- Graph dimensions:")
+        gd = {'Graph': [], 'n_nodes': [], 'n_edges': []}
+        for label in self.SG.metagraph.nodes:
+            metadata = self.SG.get_metadata(label)
+            gd['Graph'].append(label)
+            gd['n_nodes'].append(metadata['nodes']['n_nodes'])
+            gd['n_edges'].append(metadata['edges']['n_edges'])
+        snode_md = pd.DataFrame(gd)
+        print(snode_md)
+
+        # Show bigraph (sedge) dimensions
+        print("\n-- Bigraph dimensions:")
+        gd = {'Bigraph': [], 'n_source': [], 'n_target': [],
+              'n_edges': []}
+        if 'label' in self.SG.metagraph.df_edges:
+            for label in self.SG.metagraph.df_edges['label']:
+                metadata = self.SG.get_metadata(label, is_node_name=False)
+                gd['Bigraph'].append(label)
+                gd['n_source'].append(metadata['nodes']['n_source'])
+                gd['n_target'].append(metadata['nodes']['n_target'])
+                gd['n_edges'].append(metadata['edges']['n_edges'])
+            sedge_md = pd.DataFrame(gd)
+            print(sedge_md)
+
+        # Restore logging mode
+        old_level = self.global_parameters['logformat']['cons_level']
+        logging.getLogger().setLevel(old_level)
+
+        return
+
+    def show_snode(self, path2snode):
+        """
+        A quick preview of a supernode.
+
+        Parameters
+        ----------
+        path2snode : str
+            Path to the supernode
+        """
+
+        label = path2snode.split(os.path.sep)[-1]
+        self.SG.activate_snode(label)
+        self.SG.snodes[label].pprint(10)
+        self._deactivate()
+
+        return
+
+    def show_sedge(self, path2sedge):
+        """
+        A quick preview of a superedge.
+
+        Parameters
+        ----------
+        path2sedge : str
+            Path to the superedge
+        """
+
+        label = path2sedge.split(os.path.sep)[-1]
+        self.SG.activate_sedge(label)
+        self.SG.sedges[label].pprint()
+        self._deactivate()
+
+        return
+
+    def reset_snode(self, path):
+        """
+        Reset snode in path
+
+        Parameters
+        ----------
+        path : str
+            Path to snode
+        """
+
+        label = path.split(os.path.sep)[-1]
+        self.SG.drop_snode(label)
+        logging.info(f'---- Graph {label} has been removed.')
+
+        return
+
+    def reset_sedge(self, path):
+        """
+        Reset sedge in path
+
+        Parameters
+        ----------
+        path : str
+            Path to sedge
+        """
+
+        label = path.split(os.path.sep)[-1]
+        self.SG.drop_sedge(label)
+
+        logging.info(f'---- Bigraph {label} has been removed.')
+
+        return
+
     # ###########
     # Graph tools
     # ###########
@@ -1417,8 +1488,8 @@ class SgTaskManager(object):
             # Remove the original graph from memory to avoid saving it.
             self.SG.deactivate_snode(graph_name)
         self.SG.save_supergraph()
-        logging.info(f'---- Graph {new_graph_name} saved with ' +
-                     f'{self.SG.snodes[new_graph_name].n_nodes} nodes and ' +
+        logging.info(f'---- Graph {new_graph_name} saved with '
+                     f'{self.SG.snodes[new_graph_name].n_nodes} nodes and '
                      f'{self.SG.snodes[new_graph_name].n_edges} edges')
         self._deactivate()
 
@@ -1449,8 +1520,8 @@ class SgTaskManager(object):
         # Remove the original graph from memory to avoid saving it.
         self.SG.deactivate_snode(graph_name)
         self.SG.save_supergraph()
-        logging.info(f'---- Graph {new_graph_name} saved with ' +
-                     f'{self.SG.snodes[new_graph_name].n_nodes} nodes and ' +
+        logging.info(f'---- Graph {new_graph_name} saved with '
+                     f'{self.SG.snodes[new_graph_name].n_nodes} nodes and '
                      f'{self.SG.snodes[new_graph_name].n_edges} edges')
         self._deactivate()
 
@@ -1495,7 +1566,7 @@ class SgTaskManager(object):
         s_label = path2snode.split(os.path.sep)[-1]
 
         # Load csv_files
-        path2_p2r = os.path.join(path2tables, 'researcher_project.csv')
+        path2_p2r = path2tables / 'researcher_project.csv'
 
         df_p2r = pd.read_csv(path2_p2r)    # , usecols=['corpusid'])
         source_nodes = list(df_p2r['REFERENCIA'])
@@ -1639,8 +1710,8 @@ class SgTaskManager(object):
 
         n0_default = 10
         n0 = float(input(
-            f"Select average number of edges per node [{n0_default}]: ") or
-            n0_default)    # Be careful: this 'or' is order-sensitive...
+            f"Select average number of edges per node [{n0_default}]: ")
+            or n0_default)    # Be careful: this 'or' is order-sensitive...
         n_edges = int(n0 * n_gnodes)
 
         # #################
@@ -1681,9 +1752,9 @@ class SgTaskManager(object):
         logging.info(f"-- -- Similarity measure: {md['edges']['metric']}")
         logging.info(f"-- -- Number of nodes: {md['nodes']['n_nodes']}")
         logging.info(f"-- -- Number of edges: {md['edges']['n_edges']}")
-        logging.info(f"-- -- Average neighbors per node: " +
+        logging.info(f"-- -- Average neighbors per node: "
                      f"{md['edges']['neighbors_per_sampled_node']}")
-        logging.info(f"-- -- Density of the similarity graph: " +
+        logging.info(f"-- -- Density of the similarity graph: "
                      f"{100 * md['edges']['density']} %")
 
         # Save graph: nodes and edges
@@ -1728,8 +1799,8 @@ class SgTaskManager(object):
         if n0 is None:
             n0_default = 0
             # Be careful: this 'or' is order-sensitive...
-            n0 = float(input(f"Select number of nodes [0=all]: ") or
-                       n0_default)
+            n0 = float(input(f"Select number of nodes [0=all]: ")
+                       or n0_default)
 
         # #########
         # LOAD DATA
@@ -1769,7 +1840,7 @@ class SgTaskManager(object):
         if n_epn is None:
             n0_default = 10
             # Be careful: this 'or' is order-sensitive...
-            n_epn = float(input(f"Select average number of edges per node " +
+            n_epn = float(input(f"Select average number of edges per node "
                                 f"[{n0_default}]: ") or n0_default)
         n_edges = int(n_epn * n_gnodes)
 
@@ -1804,9 +1875,9 @@ class SgTaskManager(object):
         logging.info(f"-- -- Similarity measure: {md['edges']['metric']}")
         logging.info(f"-- -- Number of nodes: {md['nodes']['n_nodes']}")
         logging.info(f"-- -- Number of edges: {md['edges']['n_edges']}")
-        logging.info(f"-- -- Average neighbors per node: " +
+        logging.info(f"-- -- Average neighbors per node: "
                      f"{md['edges']['neighbors_per_sampled_node']}")
-        logging.info(f"-- -- Density of the similarity graph: " +
+        logging.info(f"-- -- Density of the similarity graph: "
                      f"{100 * md['edges']['density']} %")
 
         gc.collect()
@@ -1874,9 +1945,9 @@ class SgTaskManager(object):
         logging.info(f"-- -- Similarity measure: {md['edges']['metric']}")
         logging.info(f"-- -- Number of nodes: {md['nodes']['n_nodes']}")
         logging.info(f"-- -- Number of edges: {md['edges']['n_edges']}")
-        logging.info(f"-- -- Average neighbors per node: " +
+        logging.info(f"-- -- Average neighbors per node: "
                      f"{md['edges']['neighbors_per_sampled_node']}")
-        logging.info(f"-- -- Density of the similarity graph: " +
+        logging.info(f"-- -- Density of the similarity graph: "
                      f"{100 * md['edges']['density']} %")
 
         # Save graph: nodes and edges
@@ -2015,13 +2086,13 @@ class SgTaskManager(object):
         if len(mlabel) == 0:
             logging.warning("The selected sedges have no common snode")
         elif len(mlabel) == 2:
-            logging.warning("The selected sedges have the same snodes. " +
+            logging.warning("The selected sedges have the same snodes. "
                             "One and only one node must be the same")
         else:
 
             # Name of the output sedge
-            e_label = ((set([xmlabel0, xmlabel1]) - mlabel).pop() + '_2_' +
-                       (set([mylabel0, mylabel1]) - mlabel).pop())
+            e_label = ((set([xmlabel0, xmlabel1]) - mlabel).pop() + '_2_'
+                       + (set([mylabel0, mylabel1]) - mlabel).pop())
 
             # Compute transitive graph
             self.SG.transitive_graph(e_label, xmlabel, mylabel)
@@ -2160,8 +2231,8 @@ class SgTaskManager(object):
                                    remove_none=False)
 
         # Print results
-        logging.info(f'-- -- The value of {metric.upper()} between ' +
-                     f'community {comm1} from graph {graph1_name} and ' +
+        logging.info(f'-- -- The value of {metric.upper()} between '
+                     f'community {comm1} from graph {graph1_name} and '
                      f'community {comm2} from graph {graph2_name} is {d}')
 
         self._deactivate()
@@ -2262,16 +2333,15 @@ class SgTaskManager(object):
 
         # #########################
         # Copy csv into Halo folder
-        path_orig = os.path.join(path2sedge, f'halo_{e_label}.csv')
-        path_dest = os.path.join(
-            self.path2halo, 'halo', 'data', 'bigraph_halo.csv')
+        path_orig = path2sedge / f'halo_{e_label}.csv'
+        path_dest = self.path2halo / 'halo' / 'data' / 'bigraph_halo.csv'
         shutil.copyfile(path_orig, path_dest)
 
         # ##############
         # Edit HTML file
 
         # # Read template file
-        path2html_template = os.path.join('templates', template_html)
+        path2html_template = pathlib.Path('templates') / template_html
         text = open(path2html_template).read()
         title = f'{s_label} - {t_label}'
         text = text.replace('[[TITLE]]', title)
@@ -2281,7 +2351,7 @@ class SgTaskManager(object):
         text = _htmlize(text)
 
         # Write html file
-        path2html = os.path.join(self.path2halo, 'halo', 'bigraph.html')
+        path2html = self.path2halo / 'halo' / 'bigraph.html'
         with open(path2html, "w+") as f:
             f.write(text)
 
@@ -2289,15 +2359,14 @@ class SgTaskManager(object):
         # Edit JS file
 
         # # Read template file
-        path2html_template = os.path.join('templates', template_js)
+        path2html_template = pathlib.Path('templates') / template_js
         text = open(path2html_template).read()
         text = text.replace('[[TITLE]]', title)
         for x in ['SOURCE_NM', 'SOURCE_CAT', 'TARGET_CAT', 'TARGET_NM']:
             text = text.replace(f'[[{x}]]', inv_map[x])
 
         # Write html file
-        path2js = os.path.join(
-            self.path2halo, 'halo', 'make_bigraph.js')
+        path2js = self.path2halo / 'halo' / 'make_bigraph.js'
         with open(path2js, "w+") as f:
             f.write(text)
 
@@ -2361,8 +2430,8 @@ class SgTaskManager(object):
         print(df.head(50))
 
         # Save the top n columns only
-        path2out = os.path.join(self.path2project, self.f_struct['output'],
-                                f'top_{label}_{feature}.xlsx')
+        path2out = (self.path2project / self.f_struct['output']
+                    / f'top_{label}_{feature}.xlsx')
         df.iloc[:n].to_excel(path2out, index=False, encoding='utf-8')
         print(f"-- -- Top {n} saved in {path2out}")
 

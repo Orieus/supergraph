@@ -12,7 +12,7 @@ Created on June 18 2018
 
 """
 
-import os
+import pathlib
 import argparse
 
 # Local imports
@@ -35,12 +35,14 @@ parser.add_argument('--source', type=str, default='../source_data',
 args = parser.parse_args()
 
 # Read project_path
-project_path = args.p
+path2project = args.p
 if args.p is None:
-    while project_path is None or project_path == "":
+    while path2project is None or path2project == "":
         project_path = input('-- Write the path to the project to load or '
                              'create: ')
-if os.path.isdir(args.p):
+path2project = pathlib.Path(path2project)
+
+if path2project.is_dir():
     option = 'load'
 else:
     option = 'create'
@@ -48,19 +50,20 @@ active_options = None
 query_needed = False
 
 # Create SuperGraph Project
-paths2data = {'topicmodels': os.path.join(args.source, 'topic_models'),
-              'agents': os.path.join(args.source, 'agents'),
-              'ACL_models': os.path.join(args.source, 'ACL_models')}
-tm = SgTaskManager(project_path, paths2data)
+path2source = pathlib.Path(args.source)
+paths2data = {'topicmodels': path2source / 'topic_models',
+              'agents': path2source / 'agents',
+              'ACL_models': path2source / 'ACL_models'}
+tm = SgTaskManager(path2project, paths2data, path2source)
 
 # ########################
 # Prepare user interaction
 # ########################
 
-paths2data = {'graphs': os.path.join(project_path, 'graphs'),
-              'bigraphs': os.path.join(project_path, 'bigraphs'),
-              'topicmodels': os.path.join(args.source, 'topic_models'),
-              'agents': os.path.join(args.source, 'agents')}
+paths2data = {'graphs': path2project / 'graphs',
+              'bigraphs': path2project / 'bigraphs',
+              'topicmodels': path2source / 'topic_models',
+              'agents': path2source / 'agents'}
 path2menu = 'options_menu.yaml'
 
 # ##############

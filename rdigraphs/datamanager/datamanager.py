@@ -8,14 +8,20 @@ from __future__ import print_function    # For python 2 copmatibility
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
-import copy
 import os
+import pathlib
 import logging
+import yaml
+from time import time
+
+import dask.dataframe as dd
+from dask.diagnostics import ProgressBar
 
 try:
     import tkinter as tk
     from tkinter import filedialog
 except:
+    print("WARNING: tkinter import failed. GUI will not work")
     pass
 
 # Local imports
@@ -96,16 +102,22 @@ class DataManager(object):
     data. To do so, it uses generic managers for Neo4j and SQL.
     """
 
-    def __init__(self, path2project, db_params):
+    def __init__(self, path2project, db_params, path2source=None):
         """
-        Initializes several SQL DataManager objects and one Noe4J DataManager:
+        Initializes datamanager object, which facilities read and write
+        operations.
 
-        Eaxh SQL manager is stored in dictionary self.SQL. Tipically:
+        File operation methods available.
 
-            self.SQL['Pr']  : SQL db for projects
-            self.SQL['Pu']  : SQL db for publications
-            self.SQL['Pa']  : SQL db for patents
-            self.Neo4j      : Neo4j db for graphs.
+        Also, several SQL and Neo4J DataManager objects are created to
+        facitlitate interaction with databases.
+
+        Each SQL manager is stored in dictionary self.SQL. Tipically:
+
+            self.SQL['db1']  : SQL database named db1
+            self.SQL['db2']  : SQL database named db2
+            ...
+            self.Neo4j      : Neo4j graph database
 
         Parameters
         ----------
@@ -113,11 +125,23 @@ class DataManager(object):
             Path to the project folder
         db_params : dict
             Parameters to stablish db connections.
+        path2source : str or None, optional (default=None)
+            Path to the folder containing several data sources.
+            This parameter is optional to allow backward compatibility.
+            Future versions of this datamanager will modify all methods to
+            use this variable, that will be ncessarily string-like.
         """
 
         # Store paths to the main project folders and files
         self._db_params = db_params
-        self._path2project = copy.copy(path2project)
+        self._path2project = pathlib.Path(path2project)
+
+        self._path2source = None
+        if path2source is not None:
+            self._path2source = pathlib.Path(path2source)
+
+            # Path to the folder containing graph data tables
+            self._path2tables = self._path2source / "tables_of_nodes"
 
         # This will be a fake SQL connector, used to forze a link in the UML
         # diagram generated with pyreverse
@@ -128,6 +152,8 @@ class DataManager(object):
 
         # Create handlers for all sql DBs
         selections = db_params['SQL']['db_selection']
+        if selections is None:
+            selections = {}
         for corpus, name in selections.items():
             if name:
                 logging.info(f'-- -- Connecting database {name}')
@@ -157,23 +183,265 @@ class DataManager(object):
                     self.dbON = self.dbON * self.SQL[corpus].dbON
                 else:
                     # The selected database is not of the expected type
-                    print(f"-- -- ERROR: a DB of class {name} was expected. " +
+                    print(f"-- -- ERROR: a DB of class {name} was expected. "
                           f"A DB of class {db['category']} was found.")
 
         # Crate handler for the Neo4j db
-        db = db_params['neo4j']
-        server = db['server']
-        user = db['user']
-        password = db['password']
+        if 'neo4j' in db_params:
+            db = db_params['neo4j']
+            server = db['server']
+            user = db['user']
+            password = db['password']
 
-        try:
-            self.Neo4j = DMneo4j(server, password, user)
-        except:
-            logging.warning("-- Neo4J DB connection failed. " +
-                            "Graph data is not accessible")
-            self.dbON = False
+            try:
+                self.Neo4j = DMneo4j(server, password, user)
+            except:
+                logging.warning("-- Neo4J DB connection failed. "
+                                "Graph data are not accessible")
+                self.dbON = False
 
         return
+
+    def _get_path2feather(self, sampling_factor):
+        """
+        Returns the path to the feather file associated to the subcorpubs based
+        on the given sampling factor
+
+        Parameters
+        ----------
+        sampling_factor : int
+            Sampling factor
+        """
+
+        if sampling_factor == 1:
+            path2feather = self.path2table / 'dataset.feather'
+        else:
+            # Generate label (docs per million)
+            dpm = str(int(sampling_factor * 1e6))
+            path2feather = self.path2table / f'dataset_{dpm}.feather'
+
+        return path2feather
+
+    def __load_metadata(self):
+
+        path2metadata = self.path2table / 'metadata.yaml'
+
+        if not path2metadata.is_file():
+            logging.error(
+                f"-- A metadata file in {path2metadata} is missed. It is "
+                "required for this corpus. Corpus not loaded")
+
+        with open(path2metadata, 'r', encoding='utf8') as f:
+            self.metadata = yaml.safe_load(f)
+
+        return
+
+    def __update_metadata(self):
+
+        path2metadata = self.path2table / 'metadata.yaml'
+        with open(path2metadata, 'w') as f:
+            yaml.dump(self.metadata, f)
+
+        return
+
+    def __check_embeddings(self, columns):
+
+        self.metadata["corpus_has_embeddings"] = bool(
+            (np.array(columns) == 'embeddings').sum() > 0)
+        self.__update_metadata()
+
+        return
+
+    def get_names_of_dataset_tables(self):
+
+        table_list = [e.stem for e in self._path2tables.iterdir()
+                      if e.is_dir()]
+
+        # Since the dataset folder can contain csv and feather versions of the
+        # same dataset, we remove duplicates
+        table_list = sorted(list(set(table_list)))
+
+        return table_list
+
+    def import_graph_data_from_tables(self, table_name, sampling_factor=1):
+        """
+        Loads a dataframe of documents from one or several files in tabular
+        format.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the tabular dataset. It should be the name of a folder in
+            self.path2source
+
+        sampling_factor : float, optional (default=1)
+            Fraction of documents to be taken from the original corpus.
+            (Used for SemanticScholar and patstat only)
+        """
+
+        # Loading corpus
+        logging.info(f'-- Loading dataset {table_name}')
+        t0 = time()
+
+        self.table_name = table_name
+        self.path2table = self._path2tables / table_name
+        self.__load_metadata()
+        path2feather = self._get_path2feather(sampling_factor)
+
+        # #################################################
+        # Load corpus data from feather file (if it exists)
+        if path2feather.is_file():
+
+            logging.info(f'-- -- Feather file {path2feather} found...')
+            df_table = pd.read_feather(path2feather)
+
+            # Log results
+            logging.info(f"-- -- Dataset {table_name} with {len(df_table)} "
+                         f" documents loaded in {time() - t0:.2f} secs.")
+
+            self.__check_embeddings(df_table.columns)
+
+            return df_table
+
+        # #########################################
+        # Load corpus data from its original source
+
+        # By default, neither corpus cleaning nor language filtering are done
+        clean_corpus = table_name in {
+            'SemanticScholar', 'SemanticScholar_emb',
+            'patstat', 'patstat_emb'}
+
+        if table_name in {'SemanticScholar', 'SemanticScholar_emb'}:
+            path2metadata = self.path2table / 'metadata.yaml'
+
+            if not path2metadata.is_file():
+                logging.error(
+                    f"-- A metadata file in {path2metadata} is missed. It is "
+                    "required for this corpus. Corpus not loaded")
+
+            with open(path2metadata, 'r', encoding='utf8') as f:
+                metadata = yaml.safe_load(f)
+            path2texts = pathlib.Path(metadata['corpus'])
+
+            df = dd.read_parquet(path2texts)
+            dfsmall = df.sample(frac=sampling_factor, random_state=0)
+
+            with ProgressBar():
+                df_table = dfsmall.compute()
+
+            # Remove unrelevant fields
+            # Available fields are: 'id', 'title', 'paperAbstract', 's2Url',
+            #     'pdfUrls', 'year', 'sources', 'doi', 'doiUrl', 'pmid',
+            #     'magId', 'fieldsOfStudy', 'journalName', 'journalPages',
+            #     'journalVolume', 'venue', 'langue', 'embeddings'
+            selected_cols = ['id', 'title', 'year', 'fieldsOfStudy',
+                             'journalName', 'venue', 'langue']
+            if 'embeddings' in df_table:
+                selected_cols += ['embeddings']
+            df_table = df_table[selected_cols]
+
+            # Map column names to normalized names
+            # mapping = {'paperAbstract': 'description',
+            #            'fieldsOfStudy': 'keywords'}
+            # df_table.rename(columns=mapping, inplace=True)
+
+            # Map list of keywords to a string (otherwise, no feather file can
+            # be saved)
+            # col = 'keywords'   # Just to abbreviate
+            col = 'fieldsOfStudy'
+            df_table[col] = df_table[col].apply(
+                lambda x: ','.join(x.astype(str)) if x is not None else '')
+
+            # Map year to string
+            # This avoids mixed types: numeric years and text cells (containing
+            # ''). These mixed type raise an error saving the feather file
+            col = 'year'
+            df_table[col] = df_table[col].apply(
+                lambda x: str(int(x)) if not np.isnan(x) else '')
+
+        elif table_name in {'patstat', 'patstat_emb'}:
+
+            path2metadata = self.path2corpus / 'metadata.yaml'
+
+            if not path2metadata.is_file():
+                logging.error(
+                    f"-- A metadata file in {path2metadata} is missed. It is "
+                    "required for this corpus. Corpus not loaded")
+
+            with open(path2metadata, 'r', encoding='utf8') as f:
+                metadata = yaml.safe_load(f)
+            path2texts = pathlib.Path(metadata['corpus'])
+
+            df = dd.read_parquet(path2texts)
+            dfsmall = df.sample(frac=sampling_factor, random_state=0)
+
+            with ProgressBar():
+                df_table = dfsmall.compute()
+
+            # Remove unrelevant fields
+            # Available fields are: appln_id, docdb_family_id, appln_title,
+            # appln_abstract, appln_filing_year, earliest_filing_year,
+            # granted, appln_auth, receiving_office, ipr_type
+            selected_cols = ['appln_id', 'appln_title', 'appln_abstract']
+            if 'embeddings' in df_table:
+                selected_cols += ['embeddings']
+            df_table = df_table[selected_cols]
+
+            # Map column names to normalized names
+            mapping = {'appln_id': 'id',
+                       'appln_title': 'title',
+                       'appln_abstract': 'description'}
+            df_table.rename(columns=mapping, inplace=True)
+
+        else:
+            logging.warning("-- Unknown corpus")
+            return None
+
+        # ############
+        # Clean corpus
+        if clean_corpus:
+
+            l0 = len(df_table)
+            logging.info(f"-- -- {l0} base documents loaded")
+
+            # Remove duplicates, if any
+            df_table.drop_duplicates(subset=['id'], inplace=True)
+            l1 = len(df_table)
+            logging.info(f"-- -- {l0 - l1} duplicated documents removed")
+
+            # Remove documents with missing data, if any
+            ind_notna = df_table['title'].notna()
+            df_table = df_table[ind_notna]
+
+            # Fill nan cells with empty strings
+            df_table.fillna("", inplace=True)
+
+            # Remove documents with zero-length title
+            df_table = df_table[df_table['title'] != ""]
+
+            # Remove special characters
+            df_table['title'] = df_table['title'].str.replace('\t', '')
+
+            # Log results
+            l2 = len(df_table)
+            logging.info(f"-- -- {l1 - l2} documents with empty title: "
+                         "removed")
+
+        # Reset the index and drop the old index
+        df_table = df_table.reset_index(drop=True)
+
+        self.__check_embeddings(df_table.columns)
+
+        # ############
+        # Log and save
+
+        # Save to feather file
+        logging.info(f"-- -- Corpus {table_name} with {len(df_table)} "
+                     f" documents loaded in {time() - t0:.2f} secs.")
+        df_table.to_feather(path2feather)
+        logging.info(f"-- -- Corpus saved in feather file {path2feather}")
+
+        return df_table
 
     def readCoordsFromFile(self, fpath=None, fields=['thetas'], sparse=False,
                            path2nodenames=None, ref_col='corpusid'):
