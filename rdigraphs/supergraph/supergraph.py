@@ -981,10 +981,9 @@ class SuperGraph(object):
 
         return
 
-    def computeSimGraph(self, label, R=None, n_edges=None, n_gnodes=None,
-                        similarity='He2', g=1, th_gauss=0.1, rescale=False,
-                        blocksize=25_000, useGPU=False, tmp_folder=None,
-                        save_every=1e300, verbose=True):
+    def computeSimGraph(self, label, s_min=None, n_edges=None, n_gnodes=None,
+                        similarity='He2', g=1, blocksize=25_000, useGPU=False,
+                        tmp_folder=None, save_every=1e300, verbose=True):
         """
         Calls the snode method to compute a similarity graph
 
@@ -992,9 +991,9 @@ class SuperGraph(object):
         ----------
         label : str
             Name of the snode where the similarity graph will be computed.
-        R : float or None, optional (default=None)
-            Radius. Edges link all data pairs at distance lower than R
-            This is to forze a sparse graph.
+        s_min : float or None, optional (default=None)
+            Similarity threshold. Edges link all data pairs with similarity
+            higher than R. This forzes a sparse graph.
         n_edges : int or None, optional (default=None)
             Target number of edges. n_edges is an alternative to radius. Only
             one of both must be specified
@@ -1015,15 +1014,10 @@ class SuperGraph(object):
             (7) 'He->JS' (Same as JS, but the graph is computed after pre-
             selecting edges using Hellinger's distances and a theoretical bound
             (8) 'He2->JS':Same as He-Js, but using a self implementation of He
+            (9) 'cosine', cosine similarity
+
         g : int or float, optional (default=1)
-            Exponent for the affinity mapping (not used for 'Gauss')
-        th_gauss : float, optional (default=0.1)
-            Similarity threshold All similarity values below this threshold are
-            set to zero. This is only for the gauss method, the rest of them
-            compute the threshold automatically from R).
-        rescale: bool, optional (default=False)
-            If True, affinities are computed from distances by rescaling values
-            so that the minimum is zero and maximum is 1.
+            Exponent for the affinity mapping
         blocksize : int, optional (default=25_000)
             Size of each block for affinity computations
         useGPU : bool, optional (default=False)
@@ -1046,10 +1040,9 @@ class SuperGraph(object):
             self.activate_snode(label)
 
         self.snodes[label].computeSimGraph(
-            R=R, n_gnodes=n_gnodes, n_edges=n_edges, similarity=similarity,
-            g=g, th_gauss=th_gauss, rescale=rescale, blocksize=blocksize,
-            useGPU=useGPU, tmp_folder=tmp_folder, save_every=save_every,
-            verbose=verbose)
+            s_min=s_min, n_gnodes=n_gnodes, n_edges=n_edges,
+            similarity=similarity, g=g, blocksize=blocksize, useGPU=useGPU,
+            tmp_folder=tmp_folder, save_every=save_every, verbose=verbose)
 
         # Update metagraph
         df = self.metagraph.df_nodes    # This is just to abbreviate.
@@ -1058,11 +1051,11 @@ class SuperGraph(object):
 
         return
 
-    def computeSimBiGraph(self, s_label, t_label, e_label=None, R=None,
+    def computeSimBiGraph(self, s_label, t_label, e_label=None, s_min=None,
                           n_edges=None, n_gnodesS=None, n_gnodesT=None,
-                          similarity='He2', g=1, rescale=False,
-                          blocksize=25_000, useGPU=False, tmp_folder=None,
-                          save_every=1e300, verbose=True):
+                          similarity='He2', g=1, blocksize=25_000,
+                          useGPU=False, tmp_folder=None, save_every=1e300,
+                          verbose=True):
         """
         Calls the snode method to compute a similarity bipartite graph.
 
@@ -1080,9 +1073,9 @@ class SuperGraph(object):
             Name of the target snode
         e_label : str or None, optional (default=None)
             Name of the new s_edge
-        R : float or None, optional (default=None)
-            Radius. Edges link all data pairs at distance lower than R.
-            This is to forze a sparse graph.
+        s_min : float or None, optional (default=None)
+            Similarity threshold. Edges link all data pairs with similarity
+            higher than R. This forzes a sparse graph.
         n_edges : int or None, optional (default=None)
             Target number of edges. n_edges is an alternative to radius. Only
             one of both must be specified
@@ -1101,9 +1094,6 @@ class SuperGraph(object):
             (2) 'He2->JS': 1 minus Jensen-Shannon (JS) divergence
         g : int or float, optional (default=1)
             Exponent for the affinity mapping
-        rescale: bool, optional (default=False)
-            If True, affinities are computed from distances by rescaling values
-            so that the minimum is zero and maximum is 1.
         blocksize : int, optional (default=25_000)
             Size of each block for affinity computations
         useGPU : bool, optional (default=False)
@@ -1147,8 +1137,8 @@ class SuperGraph(object):
                                        Xs=self.snodes[s_label].T,
                                        Xt=self.snodes[t_label].T)
         self.sedges[e_label].computeSimBiGraph(
-            R=R, n_gnodesS=n_gnodesS, n_gnodesT=n_gnodesT, n_edges=n_edges,
-            similarity=similarity, g=g, rescale=rescale, blocksize=blocksize,
+            s_min=s_min, n_gnodesS=n_gnodesS, n_gnodesT=n_gnodesT,
+            n_edges=n_edges, similarity=similarity, g=g, blocksize=blocksize,
             useGPU=useGPU, tmp_folder=tmp_folder, save_every=save_every,
             verbose=verbose)
 
@@ -1227,8 +1217,8 @@ class SuperGraph(object):
 
         return
 
-    def sub_snode(self, xlabel, ynodes, ylabel=None, sampleT=False,
-                  save_T=False):
+    def sub_snode(self, xlabel, ynodes, ylabel=None, sampleT=True,
+                  save_T=True):
         """
         Subsample snode X using a given subset of nodes.
 
@@ -1246,9 +1236,9 @@ class SuperGraph(object):
         ylabel : str or None, optional (default=None)
             Name of the new snode.
             If None, the sampled snode replaces the original one
-        sampleT : bool, optional (defaul=False)
+        sampleT : bool, optional (defaul=True)
             If True, the feature matrix is also sampled, if it exists.
-        save_T : bool, optional (default=False)
+        save_T : bool, optional (default=True)
             If True, the feature matrix T is saved into an npz file.
         """
 
@@ -1267,7 +1257,7 @@ class SuperGraph(object):
             ylabel = xlabel
 
         # Separate nodes already in x and new nodes
-        if type(ynodes) == list:
+        if isinstance(ynodes, list):
             xnodes = self.snodes[xlabel].nodes
             ynodes_new = list(set(ynodes) - set(xnodes))
             ynodes_in_x = list(set(ynodes) - set(ynodes_new))
@@ -1435,7 +1425,7 @@ class SuperGraph(object):
                      f"{n_edges} edges")
         return
 
-    def filter_edges_from_snode(self, label, th, rescale=False):
+    def filter_edges_from_snode(self, label, th):
         """
         Removes edges below a given threshold from a given snode
 
@@ -1445,18 +1435,16 @@ class SuperGraph(object):
             Name of the snode
         th : int or float
             Threshold
-        rescale : bool, optional (default=False)
-            If True, rescale non-zero weights to span from 0 to 1
         """
 
         if not self.is_active_snode(label):
             self.activate_snode(label)
 
-        self.snodes[label].filter_edges(th, rescale)
+        self.snodes[label].filter_edges(th)
 
         return
 
-    def filter_edges_from_sedge(self, label, th, rescale=False):
+    def filter_edges_from_sedge(self, label, th):
         """
         Removes edges below a given threshold from a given snode
 
@@ -1466,14 +1454,12 @@ class SuperGraph(object):
             Name of the snode
         th : int or float
             Threshold
-        rescale : bool, optional (default=False)
-            If True, rescale non-zero weights to span from 0 to 1
         """
 
         if not self.is_active_snode(label):
             self.activate_snode(label)
 
-        self.sedges[label].filter_edges(th, rescale)
+        self.sedges[label].filter_edges(th)
 
         return
 

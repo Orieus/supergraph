@@ -130,4 +130,5 @@ dmypy.json
 
 # Additions JCS
 *.DS_Store 
+temp/
 

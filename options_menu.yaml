@@ -115,6 +115,7 @@ gInference:
   options:
     - equivalence_graph
     - infer_sim_graph
+    - import_and_infer_sim_graph
     - infer_eq_simgraph
     - infer_sim_bigraph
     - infer_ppr_graph
@@ -193,12 +194,12 @@ display_graphs:
 # Options for import_data
 
 import_snode_from_table:
-  title: Import nodes and edges from table files
+  title: Import nodes and features from table files
   options:
     - get_method: get_names_of_dataset_tables
 
 import_nodes_and_model:
-  title: Import nodes and feature_matrix into a zero-edge graph
+  title: Import nodes from table files and features from npz files
   options:
     - path: topicmodels
 
@@ -245,10 +246,7 @@ import_agents:
 showSDBdata:
   title: Show SQL data sources
   options:
-    - parameters:
-        Pu: Publications
-        Pr: Projects
-        Pa: Patents
+    - get_method: get_names_of_SQL_dbs
 
 manage_Neo4J:
   title: Manage Neo4J database
@@ -313,7 +311,24 @@ equivalence_graph:
     - path: topicmodels
 
 infer_sim_graph:
-  title: 'Similarity graph:                from A_X to A-A'
+  title: 'Similarity graph:                   from A_X to A-A'
+  options:
+    - path: graphs
+    - parameters:
+        He:  "He: 1 minus squared Hellinger's distance (JS) (sklearn-based)"
+        He2: 'He2: self implementation of He (faster)'
+        BC: 'BC: Bhattacharyya coefficient'
+        l1:  'l1: 1 minus l1 distance'
+        JS:  'JS: Jensen-Shannon similarity (too slow)'
+        Gauss: 'Gauss: An exponential function of the squared l2 distance'
+        He->JS: 'He->JS: JS through He and a theoretical bound'
+        He2->JS: 'He2->JS: Same as He->JS, but using implementation He2'
+        l1->JS: 'l1->JS: JS through l1 and a theoretical bound'
+        cosine: 'cosine: Cosine similarity'
+        ncosine: 'ncosine: Normalized cosine similarity (rescaled to [0, 1])' 
+
+import_and_infer_sim_graph:
+  title: 'Import and infer Similarity graph:  from A_X to A-A'
   options:
     - path: topicmodels
     - parameters:
@@ -327,7 +342,7 @@ infer_sim_graph:
         l1->JS: 'l1->JS: JS through l1 and a theoretical bound'
 
 infer_eq_simgraph:
-  title: 'Equivalent Similarity graph:     from A_X to eqA-eqA'
+  title: 'Equivalent Similarity graph:        from A_X to eqA-eqA'
   options:
     - path: topicmodels
     - parameters:
@@ -341,7 +356,7 @@ infer_eq_simgraph:
         l1->JS: 'l1->JS: JS through l1 and a theoretical bound'
 
 infer_sim_bigraph:
-  title: 'Similarity bipartite graph:      from A_X, B_X to A-B'
+  title: 'Similarity bipartite graph:         from A_X, B_X to A-B'
   options:
     - get_method: get_graphs_with_features
     - get_method: get_graphs_with_features
@@ -355,13 +370,13 @@ infer_ppr_graph:
     - path: graphs
 
 inferBGfromA:
-  title: 'Bipartite graph from attributes: from A_B to A->B'
+  title: 'Bipartite graph from attributes:    from A_B to A->B'
   options:
     - path: graphs
     - get_method: get_attributes
 
 transduce:
-  title: 'Transductive graph:              from A-A->B to B-B'
+  title: 'Transductive graph:                 from A-A->B to B-B'
   options:
     - path: bigraphs
     - parameters:
@@ -372,14 +387,14 @@ transduce:
 #   title: 'Similarity bipartite Graph:      from A_X, B_Y to A-B'
 
 inferTransit:
-  title: 'Transitive graph:                from A->B->C to A->C'
+  title: 'Transitive graph:                   from A->B->C to A->C'
   options:
     - path: bigraphs
     - path: bigraphs
 
 
-# ###########################
-# Optionas for display_graphs
+# ##########################
+# Options for display_graphs
 
 graph_layout: 
   title: Graph layout
