@@ -372,8 +372,8 @@ class LabTaskManager(SgTaskManager):
         # Select all models for the given corpus:
         # The mixed corpus is excluded
         folders = os.listdir(self.path2tm)
-        models = [f for f in folders if f.split('_')[0] == corpus and
-                  f != 'FECYT_AI_SCOPUS_AI_PATSTAT_AI_120']
+        models = [f for f in folders if (f.split('_')[0] == corpus)
+                  and (f != 'FECYT_AI_SCOPUS_AI_PATSTAT_AI_120')]
 
         # Output folder
         p2p = self.path2project   # This is just to abbreviate
@@ -519,8 +519,8 @@ class LabTaskManager(SgTaskManager):
 
         # Select all models for the given corpus:
         folders = os.listdir(self.path2tm)
-        models = [f for f in folders if f.split('_')[0] == corpus and
-                  f != 'FECYT_AI_SCOPUS_AI_PATSTAT_AI_120']
+        models = [f for f in folders if (f.split('_')[0] == corpus)
+                  and (f != 'FECYT_AI_SCOPUS_AI_PATSTAT_AI_120')]
 
         comp_time, n_edges, cc, cmax, rmax, n_nodes = {}, {}, {}, {}, {}, {}
         c_rel = {}
@@ -736,10 +736,10 @@ class LabTaskManager(SgTaskManager):
         # Parameters
 
         if radius is None and n_edges_t is None:
-            logging.error("-- -- One of radius or n_edges_t parameters must " +
+            logging.error("-- -- One of radius or n_edges_t parameters must "
                           "be specified")
         elif radius is not None and n_edges_t is not None:
-            logging.error("-- -- Only one radius or n_edges_t parameters " +
+            logging.error("-- -- Only one radius or n_edges_t parameters "
                           "must be specified")
 
         # Read the type of topic models from the path name.
@@ -1126,11 +1126,11 @@ class LabTaskManager(SgTaskManager):
                         for i in ig:
 
                             fnames = [x for x in df_dict if
-                                      params[x]['n'] == n and
-                                      params[x]['e'] == e and
-                                      params[x]['s'] == s and
-                                      params[x]['r'] == r and
-                                      params[x]['i'] == i]
+                                      params[x]['n'] == n
+                                      and params[x]['e'] == e
+                                      and params[x]['s'] == s
+                                      and params[x]['r'] == r
+                                      and params[x]['i'] == i]
 
                             if len(fnames) > 0:
 
@@ -1256,11 +1256,11 @@ class LabTaskManager(SgTaskManager):
                             df.columns):
                         # Filter nodes (only for cluster_coef)
                         logging.info(f"-- -- Filtering nodes with few links")
-                        df = df[df['abs_in_degree'] +
-                                df['abs_out_degree'] >= 10]
+                        df = df[df['abs_in_degree']
+                                + df['abs_out_degree'] >= 10]
                     else:
                         logging.info(
-                            f"No in- and out- degree columns available to " +
+                            f"No in- and out- degree columns available to "
                             "filter nodes with few links")
 
                 df.rename(columns={"title": "Título", "pub_year": "Año",

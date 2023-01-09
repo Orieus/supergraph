@@ -678,7 +678,7 @@ class SuperGraph(object):
         # IF not, each attribute value will become a target node.
         # If yes, eath value in each list will become a target node
         if s0.n_nodes > 0:
-            atts_in_list = type(s0.df_nodes.iloc[0][attrib]) == list
+            atts_in_list = isinstance(s0.df_nodes.iloc[0][attrib], list)
         else:
             atts_in_list = False
 
@@ -710,7 +710,7 @@ class SuperGraph(object):
         # Add edges
         source_nodes = s0.df_nodes[s0.REF].tolist()
         target_nodes = s0.df_nodes[attrib].tolist()
-        if type(target_nodes[0]) == list:
+        if isinstance(target_nodes[0], list):
             print("UNTESTED: CHECK THE CASE OF ATTRIBUTE LISTS")
             breakpoint()
             edges = [(s, t) for (s, t_list) in zip(source_nodes, target_nodes)
@@ -2079,15 +2079,15 @@ class SuperGraph(object):
         # Remove commas from data
         for label in [s_att2, t_att, t_att2]:
             df_edges[label] = df_edges[label].apply(
-                lambda x: x if type(x) != str else x.replace(' ', '_'))
+                lambda x: x if not isinstance(x, str) else x.replace(' ', '_'))
             df_edges[label] = df_edges[label].apply(
-                lambda x: x if type(x) != str else x.replace(',', ''))
+                lambda x: x if not isinstance(x, str) else x.replace(',', ''))
             df_edges[label] = df_edges[label].apply(
-                lambda x: x if type(x) != str else x.replace('(', '_'))
+                lambda x: x if not isinstance(x, str) else x.replace('(', '_'))
             df_edges[label] = df_edges[label].apply(
-                lambda x: x if type(x) != str else x.replace(')', '_'))
+                lambda x: x if not isinstance(x, str) else x.replace(')', '_'))
             df_edges[label] = df_edges[label].apply(
-                lambda x: x if type(x) != str else x.replace(
+                lambda x: x if not isinstance(x, str) else x.replace(
                     'Universidad', 'Univ'))
 
         # Rename columns:
@@ -2109,7 +2109,7 @@ class SuperGraph(object):
         # expected to be str.
         # Make sure that everything is a string
         for label in ['SOURCE_CAT', 'TARGET_CAT']:
-            if any(type(x) == float for x in df_edges[label]):
+            if any(isinstance(x, float) for x in df_edges[label]):
                 df_edges[label] = df_edges[label].fillna(999)
                 df_edges[label] = df_edges[label].apply(int)
         df_edges.fillna(value="--", inplace=True)

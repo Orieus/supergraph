@@ -660,8 +660,8 @@ class DataManager(object):
         external_nodes_set = citing_set - nodes_set
 
         # Mapping nodes to a binary flag indicating membership to df_nodes
-        nodes_dict = dict([(x, 1) for x in list(nodes_set)] +
-                          [(x, 0) for x in list(external_nodes_set)])
+        nodes_dict = dict([(x, 1) for x in list(nodes_set)]
+                          + [(x, 0) for x in list(external_nodes_set)])
 
         # Select edges connecting nodes in df_nodes only
         edges = [x for x in zip(source_nodes, target_nodes)
