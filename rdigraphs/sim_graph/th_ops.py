@@ -277,6 +277,9 @@ class ThOps(object):
         self.fpath_edges = os.path.join(self.tmp_folder, f'edges_{suff}.csv')
         self.fpath_values = os.path.join(self.tmp_folder, f'values_{suff}.csv')
 
+        # This prevents some occasional but large debug messages from numba
+        logging.getLogger('numba').setLevel(logging.WARNING)
+
         return
 
     def _move_to_file(self, edge_list, thp=[], mode='w'):
@@ -444,7 +447,6 @@ class ThOps(object):
 
                 # Extract coordinates and values from product
                 uu = S.shape[1]
-                breakpoint()
                 abs_coord, coord_values = edges_weights_from_sparseU(
                     S.data, S.indptr, S.indices, uu, i, j)
                 # WARNING: OLD CODE: THE THRESHOLD-DEPENDENT VERSION
@@ -743,9 +745,13 @@ class ThOps(object):
             If mode = 'distance': a tuple (list of edges, list of values)
         """
 
+        # A theshold s_min over the ncosine similarity is equivalent to a
+        # threshold 2·s_min-1 over the cosine similarity
+        s_min_cosine = 2 * s_min - 1
+
         # Compute cosine similarity rows
         edge_ids, weights = self.cosine_sim_graph(
-            X, s_min, mode=mode, verbose=verbose)
+            X, s_min_cosine, mode=mode, verbose=verbose)
 
         # Normalize
         weights = [(w + 1) / 2 for w in weights]

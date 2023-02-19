@@ -60,4 +60,3 @@ for i in range(n_comm):
     mySG.sub_snode_by_value(xlabel, comm_label, i, ylabel=f'G_{i}')
 
 mySG.save_supergraph()
-

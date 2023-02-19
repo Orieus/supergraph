@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 # Python libraries
 import numpy as np
 
@@ -291,8 +288,8 @@ class SimGraph(ThOps):
 
         return
 
-    def _compute_sim_graph_from_threshold(
-            self, s_min=None, sim='JS', mapping='linear', g=1, verbose=True):
+    def _compute_sim_graph_from_threshold(self, s_min=None, sim='JS',
+                                          mapping='linear', g=1, verbose=True):
         """
         Computes a sparse graph for the self graph structure.
         The self graph must contain a feature matrix, self.X
@@ -361,6 +358,7 @@ class SimGraph(ThOps):
             self.weights = self.div2sim(
                 d2, mapping=mapping, g=g, B=R2_MAX_HE)
         elif sim == 'ncosine':
+
             self.edge_ids, self.weights = self.ncosine_sim_graph(
                 X, s_min, mode='distance', verbose=verbose)
 
@@ -629,8 +627,8 @@ class SimGraph(ThOps):
 
         return
 
-    def _compute_sim_graph_from_nedges(
-            self, n_edges, sim='JS', mapping='linear', g=1, verbose=True):
+    def _compute_sim_graph_from_nedges(self, n_edges, sim='JS',
+                                       mapping='linear', g=1, verbose=True):
         """
         Computes a sparse graph for a fixed number of edges.
 

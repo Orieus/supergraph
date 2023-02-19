@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 from rdigraphs.sim_graph.sim_graph import SimGraph
 
+
 def get_data(X, nmax):
     """
     Takes at most nmax rows from X at random.
@@ -44,11 +45,8 @@ alpha = 0.1 * np.ones(dim)  # Parameters of the Dirichlet distribution
 th = 0.01      # Threshold to sparsify the data matrix
 
 # Similarity graphs
-R = 0.2            # Radius for all neighbor graphs
-R = 0.8            # Radius for all neighbor graphs
 g = 1              # Power factor for the similarity computation
 outpath = pathlib.Path('./rdigraphs/test/')    # Path to save graphical results
-
 
 # ###############
 # DATA GENERATION
@@ -75,11 +73,13 @@ print(f"-- Target number of edges: {n_edges}")
 # Select similarities.
 sims = ['BC', 'ncosine', 'JS', 'l1', 'He', 'He2', 'Gauss', 'l1->JS', 'He->JS',
         'He2->JS']
+# sims = ['ncosine']
 
 # Compute similariries.
 for sim in sims:
     print(f'\n-- -- {sim} similarities:')
     sg.sim_graph(n_edges=n_edges, sim=sim, g=g, verbose=False)
+exit()
 
 # Create datagraph with the full matrix
 print("----------------------------------------------")
@@ -95,7 +95,6 @@ for sim in sims:
     sg.sim_graph(n_edges=n_edges, sim=sim, g=g, verbose=False)
 
 print("-- TEST OK\n.")
-
 
 # #####################
 # TEST SIMILARITY PLOTS
@@ -182,7 +181,7 @@ for nmax in nmax_all:
     for sim in sims:
         print(f'\n-- -- {sim} similarities:')
         t0 = time.time()
-        sg.sim_graph(R, sim=sim, g=g)
+        sg.sim_graph(s_min, sim=sim, g=g)
         tm = time.time() - t0
         time_record[sim].append(tm)
         print(f'-- -- Graph computed in {tm} seconds')

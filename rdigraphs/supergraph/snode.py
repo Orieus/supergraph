@@ -513,7 +513,11 @@ class DataGraph(object):
             # The input node is the first node in the graph
             self.df_nodes = pd.DataFrame([row])
         else:
-            self.df_nodes = self.df_nodes.append(row, ignore_index=True)
+            self.df_nodes2 = self.df_nodes.append(row, ignore_index=True)
+            # Using pandas.concat() to add a row
+            new_row = pd.DataFrame(row, index=[0])
+            self.df_nodes = pd.concat([self.df_nodes, new_row]).reset_index(
+                drop=True)
 
         self.n_nodes += 1
         self.nodes.append(node)

@@ -1,6 +1,10 @@
 #!/bin/bash
 
-source sphinx_settings/docs.env
+DOCSDIR=docs_all
+PROJECT_NAME=SuperGraph
+AUTHORS="J. Cid, M.A. Vázquez"
+RELEASE_YEAR=2023
+OUTPUT_INDEX=$DOCSDIR/build/html/index.html
 
 mkdir $DOCSDIR
 
@@ -12,10 +16,12 @@ pushd $DOCSDIR
 
 popd
 
-ln -sf "$ROOT_DIR"/sphinx_settings/*.rst "$ROOT_DIR"/$DOCSDIR/source
+cp sphinx_settings/* $DOCSDIR/source
 
-pushd $DOCSDIR/source
+# ln -sf "$ROOT_DIR"/sphinx_settings/*.rst "$ROOT_DIR"/$DOCSDIR/source
 
-patch -p0 < "$ROOT_DIR"/sphinx_settings/conf.patch
+# pushd $DOCSDIR/source
 
-popd
+# patch -p0 < "$ROOT_DIR"/sphinx_settings/conf.patch
+
+# popd
