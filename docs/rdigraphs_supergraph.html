@@ -415,6 +415,21 @@ memory.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="rdigraphs.supergraph.supergraph.SuperGraph.disambiguate_node">
+<span class="sig-name descname"><span class="pre">disambiguate_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.supergraph.supergraph.SuperGraph.disambiguate_node" title="Permalink to this definition"></a></dt>
+<dd><p>Disambiguate a given node (from any graph) based on the topological
+structure of the related snode and sedge in the supergraph</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – Path to snode</p></li>
+<li><p><strong>node_name</strong> (<em>str</em>) – Name of the node</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="rdigraphs.supergraph.supergraph.SuperGraph.drop_sedge">
 <span class="sig-name descname"><span class="pre">drop_sedge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.supergraph.supergraph.SuperGraph.drop_sedge" title="Permalink to this definition"></a></dt>
 <dd><p>Removes sedges from the supergraph</p>
@@ -548,6 +563,18 @@ updating in-memory data, the attribute list might be not updated.</p>
 <dd class="field-odd"><p>dict</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rdigraphs.supergraph.supergraph.SuperGraph.get_sedges">
+<span class="sig-name descname"><span class="pre">get_sedges</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.supergraph.supergraph.SuperGraph.get_sedges" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the label of all sedges in the supergraph</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rdigraphs.supergraph.supergraph.SuperGraph.get_snodes">
+<span class="sig-name descname"><span class="pre">get_snodes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.supergraph.supergraph.SuperGraph.get_snodes" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the label of all snodes in the supergraph</p>
 </dd></dl>
 
 <dl class="py method">

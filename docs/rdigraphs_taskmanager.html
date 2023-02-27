@@ -387,6 +387,18 @@ or folders.
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="rdigraphs.sgtaskmanager.SgTaskManager.disambiguate_node">
+<span class="sig-name descname"><span class="pre">disambiguate_node</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.sgtaskmanager.SgTaskManager.disambiguate_node" title="Permalink to this definition"></a></dt>
+<dd><p>Disambiguate a given node from a given graph based on the topological
+structure of the related graphs and bigraphs in the supergraph</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to snode</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="rdigraphs.sgtaskmanager.SgTaskManager.display_bigraph">
 <span class="sig-name descname"><span class="pre">display_bigraph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path2sedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_att1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_att2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_att</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_att2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">template_html</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'bigraph_template.html'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">template_js</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'make_bigraph_template.js'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.sgtaskmanager.SgTaskManager.display_bigraph" title="Permalink to this definition"></a></dt>
 <dd><p>Generates a bigraph visualization based on halo.</p>
@@ -422,7 +434,7 @@ connects all nodes with the same topic vector into its equivalence
 class.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to the model</p>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to snode</p>
 </dd>
 </dl>
 </dd></dl>

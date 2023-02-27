@@ -1382,7 +1382,8 @@ will become the properties of the node</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="rdigraphs.datamanager.callbacks.AuthorsDisambiguator.projects_researcher_project">
 <span class="sig-name descname"><span class="pre">projects_researcher_project</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.AuthorsDisambiguator.projects_researcher_project" title="Permalink to this definition"></a></dt>
-<dd><p>Callback function for “researcher_project” table in “projects” database.</p>
+<dd><p>Callback function for “researcher_project” table in “projects”
+database.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>df</strong> (<em>Pandas dataframe</em>) – Input data</p>
@@ -1445,7 +1446,8 @@ will become the properties of the node</p></li>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>disambiguation_map</strong> (<em>list</em>) – Path to the disambiguation map</p></li>
-<li><p><strong>new_id</strong> (<em>str</em>) – The name of the new field/column/neo4j property to be created for storing the final <em>disambiguated</em> id</p></li>
+<li><p><strong>new_id</strong> (<em>str</em>) – The name of the new field/column/neo4j property to be created for
+storing the final <em>disambiguated</em> id</p></li>
 </ul>
 </dd>
 </dl>
@@ -1466,7 +1468,8 @@ will become the properties of the node</p></li>
 <dd class="field-odd"><p><strong>df</strong> (<em>Pandas dataframe</em>) – Data with duplicates</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>unmapped</strong> – Input data with the only row with the value “left_only” in column <cite>source</cite>, or the 1st row of the input
+<dd class="field-even"><p><strong>unmapped</strong> – Input data with the only row with the value “left_only” in column
+<cite>source</cite>, or the 1st row of the input
 dataframe if there are several.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -1478,16 +1481,17 @@ dataframe if there are several.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="rdigraphs.datamanager.callbacks.Disambiguator.merge">
 <span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mapping</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.Disambiguator.merge" title="Permalink to this definition"></a></dt>
-<dd><p>Replace within the passed <cite>DataFrame</cite> the values of <cite>field</cite> that are present in the disambiguation map,
-while at the same time ensuring that the new disambiguated values are unique.</p>
+<dd><p>Replace within the passed <cite>DataFrame</cite> the values of <cite>field</cite> that are
+present in the disambiguation map, while at the same time ensuring that
+the new disambiguated values are unique.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>mapping</strong> (<em>Pandas dataframe</em>) – Disambiguation map</p></li>
 <li><p><strong>df</strong> (<em>Pandas dataframe</em>) – Data to be disambiguated</p></li>
 <li><p><strong>field</strong> (<em>str</em>) – Column to be used in <cite>df</cite></p></li>
-<li><p><strong>prefix</strong> (<em>str</em>) – Prefix to be added to a “new” identifier built from the already existing
-(not present in the disambiguation map)</p></li>
+<li><p><strong>prefix</strong> (<em>str</em>) – Prefix to be added to a “new” identifier built from the already
+existing (not present in the disambiguation map)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1502,15 +1506,16 @@ while at the same time ensuring that the new disambiguated values are unique.</p
 <dl class="py method">
 <dt class="sig sig-object py" id="rdigraphs.datamanager.callbacks.Disambiguator.replace">
 <span class="sig-name descname"><span class="pre">replace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mapping</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.Disambiguator.replace" title="Permalink to this definition"></a></dt>
-<dd><p>Replace within the passed <cite>DataFrame</cite> the values of <cite>field</cite> that are present in the disambiguation map.</p>
+<dd><p>Replace within the passed <cite>DataFrame</cite> the values of <cite>field</cite> that are
+present in the disambiguation map.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>mapping</strong> (<em>Pandas dataframe</em>) – Disambiguation map</p></li>
 <li><p><strong>df</strong> (<em>Pandas dataframe</em>) – Data to be disambiguated</p></li>
 <li><p><strong>field</strong> (<em>str</em>) – Column to be used in <cite>df</cite></p></li>
-<li><p><strong>prefix</strong> (<em>str</em>) – Prefix to be added to a “new” identifier built from the already existing
-(not present in the disambiguation map)</p></li>
+<li><p><strong>prefix</strong> (<em>str</em>) – Prefix to be added to a “new” identifier built from the already
+existing (not present in the disambiguation map)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1596,7 +1601,8 @@ while at the same time ensuring that the new disambiguated values are unique.</p
 <dl class="py function">
 <dt class="sig sig-object py" id="rdigraphs.datamanager.callbacks.patents_literature">
 <span class="sig-prename descclassname"><span class="pre">rdigraphs.datamanager.callbacks.</span></span><span class="sig-name descname"><span class="pre">patents_literature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.patents_literature" title="Permalink to this definition"></a></dt>
-<dd><p>Callback function for relating patents literature with itself in “patents” database.</p>
+<dd><p>Callback function for relating patents literature with itself in “patents”
+database.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>df</strong> (<em>Pandas dataframe</em>) – Input data</p>
@@ -1613,7 +1619,8 @@ while at the same time ensuring that the new disambiguated values are unique.</p
 <dl class="py function">
 <dt class="sig sig-object py" id="rdigraphs.datamanager.callbacks.patents_non_literature">
 <span class="sig-prename descclassname"><span class="pre">rdigraphs.datamanager.callbacks.</span></span><span class="sig-name descname"><span class="pre">patents_non_literature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.patents_non_literature" title="Permalink to this definition"></a></dt>
-<dd><p>Callback function for relating patents literature with non-patents literature in “patents” database.</p>
+<dd><p>Callback function for relating patents literature with non-patents
+literature in “patents” database.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>df</strong> (<em>Pandas dataframe</em>) – Input data</p>
@@ -1646,11 +1653,14 @@ while at the same time ensuring that the new disambiguated values are unique.</p
 
 <dl class="py function">
 <dt class="sig sig-object py" id="rdigraphs.datamanager.callbacks.projects_researchers">
-<span class="sig-prename descclassname"><span class="pre">rdigraphs.datamanager.callbacks.</span></span><span class="sig-name descname"><span class="pre">projects_researchers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.projects_researchers" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">rdigraphs.datamanager.callbacks.</span></span><span class="sig-name descname"><span class="pre">projects_researchers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'NOMBRE'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#rdigraphs.datamanager.callbacks.projects_researchers" title="Permalink to this definition"></a></dt>
 <dd><p>Callback function for “researchers” table in “projects” database.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>df</strong> (<em>Pandas dataframe</em>) – Input data</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>Pandas dataframe</em>) – Input data</p></li>
+<li><p><strong>name_col</strong> (<em>str, optional</em>) – Name of the colum with the researchers’ names</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>df</strong> – Output data</p>
