@@ -617,6 +617,23 @@ class SuperGraph(object):
 
         return atts
 
+    def get_snodes(self):
+        """
+        Returns the label of all snodes in the supergraph
+        """
+
+        return self.metagraph.nodes
+
+    def get_sedges(self):
+        """
+        Returns the label of all sedges in the supergraph
+        """
+
+        if 'label' in self.metagraph.df_edges:
+            return self.metagraph.df_edges['label'].tolist()
+        else:
+            return []
+
     # ###############
     # Snode inference
     # ###############
@@ -1974,6 +1991,80 @@ class SuperGraph(object):
             parameter=parameter, label=parameter)
 
         return
+
+    # #############
+    # Node analysis
+    # #############
+    def disambiguate_node(self, node_name):
+        """
+        Disambiguate a given node (from any graph) based on the topological
+        structure of the related snode and sedge in the supergraph
+
+        Parameters
+        ----------
+        path : str
+            Path to snode
+        node_name : str
+            Name of the node
+        """
+
+        # Find all sedges with the node
+        bgs = {}
+        for bg in self.get_sedges:
+            self.activate_sedge(bg)
+            if node_name in self.sedges[bg].get_source_nodes():
+                # Get
+                s_label, t_label = self.get_terminals(bg)
+
+                # Activate source and target snodes from the bigraph
+                self.activate_snode(s_label)
+                self.activate_snode(t_label)
+
+                # If the given node is among the source nodes of the bigraph...
+                if node_name in self.snodes[s_label].nodes:
+                    # node_location = 'source'
+                    linked_graph = t_label
+                    # Get all nodes connected to the given node
+                    linked_nodes = [x[1] for x in self.sedges[bg].edges
+                                    if x[0] == node_name]
+                # If the given node is among the target nodes of the bigraph...
+                elif node_name in self.snodes[t_label].nodes:
+                    # node_location = 'target'
+                    linked_graph = s_label
+                    # Get all nodes connected to the given node
+                    linked_nodes = [x[0] for x in self.sedges[bg].edges
+                                    if x[1] == node_name]
+
+                # Select subgraph with the linked nodes only
+                sub_g = f'sub_{linked_graph}'
+                self.sub_snode(linked_graph, linked_nodes, ylabel=sub_g)
+
+                # Apply community detection algorithms with 2 communities only
+                self.detectCommunities(
+                    sub_g, alg='louvain', ncmax=2, comm_label='coms')
+                q = self.snodes[sub_g].community_metric(
+                    'coms', 'modularity')
+
+                clabels = self.snodes[sub_g].df_nodes['coms'].tolist()
+                bgs[bg] = {'label': sub_g,
+                           'score': q,
+                           'partition': clabels}
+
+        # If all graphs claim for a partition, the node is split
+        total_score = 1
+        for q in bgs:
+            total_score *= q
+
+        print("-- Summary of scores:")
+        print(bgs)
+
+        return bgs, total_score
+
+    def node_profile(self):
+
+        report = ""
+
+        return report
 
     # #######
     # Storage

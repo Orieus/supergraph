@@ -1735,6 +1735,12 @@ class DataGraph(object):
             Name of the community detection algorithm
         parameter : str
             Name of the global parameter to compute
+
+        Returns
+        -------
+        q :: float
+            Value of the metric. This value is saved into the self.metadata
+            attribute
         """
 
         # Start
@@ -1761,7 +1767,7 @@ class DataGraph(object):
         tm = time() - t0
         logging.info(f"-- {parameter} computed in {tm} seconds")
 
-        return
+        return q
 
     def graph_layout(self, alg='fa2', color_att=None, gravity=1,
                      save_gexf=True):

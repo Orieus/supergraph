@@ -182,7 +182,7 @@ class SgTaskManager(object):
 
         # Place a copy of a default configuration file in the project folder.
         # This file should be adapted to the new project settings.
-        shutil.copyfile('parameters.default.yaml', self.path2config)
+        shutil.copyfile('config/parameters.default.yaml', self.path2config)
 
         # Update the state of the project.
         self.state['isProject'] = True
@@ -1658,6 +1658,33 @@ class SgTaskManager(object):
 
         return
 
+    def disambiguate_node(self):
+        """
+        Disambiguate a given node from a given graph based on the topological
+        structure of the related graphs and bigraphs in the supergraph
+
+        Parameters
+        ----------
+        path : str
+            Path to snode
+        """
+
+        # Modularity threshold
+        th = 0.9
+
+        # Ask for node name:
+        node_name = input('\n-- Write the node name to disambigate: ')
+
+        bgs, total_score = self.SG.disambiguate_node(node_name)
+
+        print("-- Summary of scores:")
+        print(bgs)
+
+        if total_score > th:
+            logging.info(f'-- Node {node_name} should be split')
+
+        return
+
     # ###############
     # Graph inference
     # ###############
@@ -1670,7 +1697,7 @@ class SgTaskManager(object):
         Parameters
         ----------
         path : str
-            Path to the model
+            Path to snode
         """
 
         s_label = os.path.split(path)[-1]
@@ -2357,6 +2384,18 @@ class SgTaskManager(object):
                      f'community {comm2} from graph {graph2_name} is {d}')
 
         self._deactivate()
+
+        return
+
+    def profile_node(self):
+
+        # Ask for node name:
+        node_name = input('\n-- Write the node name to disambigate: ')
+
+        node_profile = self.SG.profile_node(node_name)
+        logging.info("-- Node profile")
+        logging.info(f"-- Name of the node: {node_name}")
+        logging.info(f"-- Report: {node_profile}")
 
         return
 

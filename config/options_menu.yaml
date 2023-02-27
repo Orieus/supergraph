@@ -64,9 +64,6 @@ load:
 setup: 
   title: Activate configuration file
 
-readData: 
-  title: Read dataset
-
 import_data:
   title: Import data
   options:
@@ -109,6 +106,7 @@ graph_tools:
     - largest_community_subgraph
     - remove_isolated_nodes
     - remove_snode_attributes
+    - disambiguate_node
 
 gInference: 
   title: Graph inference tools
@@ -302,6 +300,9 @@ remove_snode_attributes:
     - path: graphs
     - get_method: get_attributes
 
+disambiguate_node:
+  title: Disambiguate node
+
 # ######################
 # Options for gInference
 
@@ -415,6 +416,9 @@ show_top_nodes:
   options:
     - path: graphs
     - get_method: get_local_features
+
+profile_node:
+  title: Show profile of a given node
 
 # #############################################################################
 # LEVEL 3
