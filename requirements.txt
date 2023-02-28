@@ -37,7 +37,7 @@ cloudpickle=2.0.0=pyhd3eb1b0_0
 colorama=0.4.5=py38hecd8cb5_0
 comm=0.1.2=py38hecd8cb5_0
 contourpy=1.0.5=py38haf03e11_0
-cryptography=38.0.4=py38hf6deb26_0
+cryptography=39.0.1=py38hf6deb26_0
 cycler=0.11.0=pyhd3eb1b0_0
 cytoolz=0.12.0=py38hca72f7f_0
 dask=2022.2.1=pyhd3eb1b0_0
@@ -55,6 +55,7 @@ flit-core=3.6.0=pyhd3eb1b0_0
 fonttools=4.25.0=pyhd3eb1b0_0
 freetype=2.12.1=hd8bbffd_0
 fsspec=2022.11.0=py38hecd8cb5_0
+gensim=4.3.0=py38hcec6c5f_0
 gettext=0.21.0=h7535e17_0
 gflags=2.2.2=h0a44026_0
 giflib=5.2.1=h6c40b1e_3
@@ -222,15 +223,18 @@ send2trash=1.8.0=pyhd3eb1b0_1
 setuptools=65.6.3=py38hecd8cb5_0
 sip=6.6.2=py38he9d5cce_0
 six=1.16.0=pyhd3eb1b0_1
+smart_open=5.2.1=py38hecd8cb5_0
 snappy=1.1.9=he9d5cce_0
 sniffio=1.2.0=py38hecd8cb5_1
 snowballstemmer=2.2.0=pyhd3eb1b0_0
 sortedcontainers=2.4.0=pyhd3eb1b0_0
 soupsieve=2.3.2.post1=py38hecd8cb5_0
 sphinx=5.0.2=py38hecd8cb5_0
+sphinx-rtd-theme=1.2.0=pypi_0
 sphinxcontrib-applehelp=1.0.2=pyhd3eb1b0_0
 sphinxcontrib-devhelp=1.0.2=pyhd3eb1b0_0
 sphinxcontrib-htmlhelp=2.0.0=pyhd3eb1b0_0
+sphinxcontrib-jquery=2.0.0=pypi_0
 sphinxcontrib-jsmath=1.0.1=pyhd3eb1b0_0
 sphinxcontrib-qthelp=1.0.3=pyhd3eb1b0_0
 sphinxcontrib-serializinghtml=1.1.5=pyhd3eb1b0_0
