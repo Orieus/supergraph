@@ -132,6 +132,9 @@ class DataManager(object):
             use this variable, that will be ncessarily string-like.
         """
 
+        # Attributes
+        self.metadata = {}
+
         # Store paths to the main project folders and files
         self._db_params = db_params
         self._path2project = pathlib.Path(path2project)
@@ -263,7 +266,8 @@ class DataManager(object):
 
         return table_list
 
-    def import_graph_data_from_tables(self, table_name, sampling_factor=1):
+    def import_graph_data_from_tables(self, table_name, sampling_factor=1,
+                                      col_id='Id'):
         """
         Loads a dataframe of documents from one or several files in tabular
         format.
@@ -277,6 +281,16 @@ class DataManager(object):
         sampling_factor : float, optional (default=1)
             Fraction of documents to be taken from the original corpus.
             (Used for SemanticScholar and patstat only)
+
+        col_id : str, optional (default='Id')
+            Name of the column with tne node names in the output dataframe
+
+        Returns
+        -------
+        df_table : pandas.DataFrame
+            Dataframe of nodes and attributes
+        metadata : dict or None
+            A dictionary of metadata taken from the table folder.
         """
 
         # Loading corpus
@@ -301,7 +315,7 @@ class DataManager(object):
 
             self.__check_embeddings(df_table.columns)
 
-            return df_table
+            return df_table, self.metadata
 
         # #########################################
         # Load corpus data from its original source
@@ -309,25 +323,21 @@ class DataManager(object):
         # By default, neither corpus cleaning nor language filtering are done
         clean_corpus = table_name in {
             'SemanticScholar', 'SemanticScholar_emb',
-            'patstat', 'patstat_emb'}
+            'patstat', 'patstat_emb', 'Cordis_Kwds3_AI_topics'}
+
+        if 'corpus' in self.metadata:
+            path2texts = pathlib.Path(self.metadata['corpus'])
+        else:
+            path2texts = pathlib.Path(self.path2table / 'corpus')
+
+        # Read data from files
+        df = dd.read_parquet(path2texts)
+        dfsmall = df.sample(frac=sampling_factor, random_state=0)
+
+        with ProgressBar():
+            df_table = dfsmall.compute()
 
         if table_name in {'SemanticScholar', 'SemanticScholar_emb'}:
-            path2metadata = self.path2table / 'metadata.yaml'
-
-            if not path2metadata.is_file():
-                logging.error(
-                    f"-- A metadata file in {path2metadata} is missed. It is "
-                    "required for this corpus. Corpus not loaded")
-
-            with open(path2metadata, 'r', encoding='utf8') as f:
-                metadata = yaml.safe_load(f)
-            path2texts = pathlib.Path(metadata['corpus'])
-
-            df = dd.read_parquet(path2texts)
-            dfsmall = df.sample(frac=sampling_factor, random_state=0)
-
-            with ProgressBar():
-                df_table = dfsmall.compute()
 
             # Remove unrelevant fields
             # Available fields are: 'id', 'title', 'paperAbstract', 's2Url',
@@ -341,9 +351,8 @@ class DataManager(object):
             df_table = df_table[selected_cols]
 
             # Map column names to normalized names
-            # mapping = {'paperAbstract': 'description',
-            #            'fieldsOfStudy': 'keywords'}
-            # df_table.rename(columns=mapping, inplace=True)
+            mapping = {'id': col_id}
+            df_table.rename(columns=mapping, inplace=True)
 
             # Map list of keywords to a string (otherwise, no feather file can
             # be saved)
@@ -361,23 +370,6 @@ class DataManager(object):
 
         elif table_name in {'patstat', 'patstat_emb'}:
 
-            path2metadata = self.path2corpus / 'metadata.yaml'
-
-            if not path2metadata.is_file():
-                logging.error(
-                    f"-- A metadata file in {path2metadata} is missed. It is "
-                    "required for this corpus. Corpus not loaded")
-
-            with open(path2metadata, 'r', encoding='utf8') as f:
-                metadata = yaml.safe_load(f)
-            path2texts = pathlib.Path(metadata['corpus'])
-
-            df = dd.read_parquet(path2texts)
-            dfsmall = df.sample(frac=sampling_factor, random_state=0)
-
-            with ProgressBar():
-                df_table = dfsmall.compute()
-
             # Remove unrelevant fields
             # Available fields are: appln_id, docdb_family_id, appln_title,
             # appln_abstract, appln_filing_year, earliest_filing_year,
@@ -388,14 +380,35 @@ class DataManager(object):
             df_table = df_table[selected_cols]
 
             # Map column names to normalized names
-            mapping = {'appln_id': 'id',
+            mapping = {'appln_id': col_id,
                        'appln_title': 'title',
                        'appln_abstract': 'description'}
             df_table.rename(columns=mapping, inplace=True)
 
+        elif table_name in {'Cordis_Kwds3_AI_topics'}:
+
+            # Remove unrelevant fields
+            # Available fields are: 'projectID', 'acronym', 'status', 'title',
+            # 'startDate', 'endDate', 'totalCost', 'ecMaxContribution',
+            # 'ecSignatureDate', 'frameworkProgramme', 'masterCall', 'subCall',
+            # 'fundingScheme', 'nature', 'objective', 'contentUpdateDate',
+            # 'rcn', 'grantDoi', 'topic', 'topic_title', 'countryContr',
+            # 'orgContr', 'coordinatorCountry', 'coordinatorOrg',
+            # 'euroSciVocCode', 'publicationID', 'patentID', 'Kwd_count',
+            # 'topics10', 'topics26'
+            selected_cols = [
+                'projectID', 'acronym', 'title', 'startDate', 'endDate',
+                'totalCost', 'ecMaxContribution', 'topics26']
+            df_table = df_table[selected_cols]
+
+            # Map column names to normalized names
+            mapping = {'projectID': col_id,
+                       'topics26': 'embeddings'}
+            df_table.rename(columns=mapping, inplace=True)
+
         else:
             logging.warning("-- Unknown corpus")
-            return None
+            return None, self.metadata
 
         # ############
         # Clean corpus
@@ -405,7 +418,7 @@ class DataManager(object):
             logging.info(f"-- -- {l0} base documents loaded")
 
             # Remove duplicates, if any
-            df_table.drop_duplicates(subset=['id'], inplace=True)
+            df_table.drop_duplicates(subset=[col_id], inplace=True)
             l1 = len(df_table)
             logging.info(f"-- -- {l0 - l1} duplicated documents removed")
 
@@ -432,6 +445,12 @@ class DataManager(object):
 
         self.__check_embeddings(df_table.columns)
 
+        # This is not needed, it is just a test to verify that the loader
+        # has given the column of node ids the requested name
+        if col_id not in df_table:
+            logging.error(f'-- -- ERROR: there is no column {col_id} in the '
+                          'output dataframe')
+
         # ############
         # Log and save
 
@@ -441,7 +460,7 @@ class DataManager(object):
         df_table.to_feather(path2feather)
         logging.info(f"-- -- Corpus saved in feather file {path2feather}")
 
-        return df_table
+        return df_table, self.metadata
 
     def readCoordsFromFile(self, fpath=None, fields=['thetas'], sparse=False,
                            path2nodenames=None, ref_col='corpusid'):

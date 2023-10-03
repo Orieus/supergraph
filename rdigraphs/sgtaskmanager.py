@@ -540,9 +540,7 @@ class SgTaskManager(object):
 
     def get_attributes(self, path):
         """
-        Returns attributes of the graph in path. At this time, this version
-        returns communities only. Eventually, it should be able to return all
-        attributes that could be transformed in independent snodes
+        Returns attributes of the graph in path.
 
         Parameters
         ----------
@@ -979,11 +977,25 @@ class SgTaskManager(object):
     # ###########
     def import_snode_from_table(self, table_name):
         """
+        Import a graph from a table containing node names, attributes and
+        (possibly) embeddings
 
+        Parameters
+        ----------
+        table_name : str
+            Name of the folder containing the table of nodes
         """
 
         # #######################
         # REQUEST NUMBER OF NODES
+
+        # The final no. of nodes is the minimum between the selected number of
+        # nodes and the result of applyng the sampling factor over the whole
+        # datasets
+        # Both parameter are needed for cases where the dataset is too large.
+        # The sampling factor can be used to avoid reading the whole dataset
+        # from the parquet files, while n0 is used as the true target number
+        # of nodes
 
         # Number of nodes.
         # If 0, all nodes are used
@@ -992,6 +1004,11 @@ class SgTaskManager(object):
         n0_default = 0
         n0 = float(input(f"Select number of nodes [0=all]: ") or n0_default)
 
+        # Sampling factor
+        sf_default = 1
+        sampling_factor = float(input(
+            f"Sampling factor (default 1 = no sampling): ") or sf_default)
+
         # #########
         # LOAD DATA
 
@@ -999,8 +1016,13 @@ class SgTaskManager(object):
         # path = self.global_parameters['source_data'][corpus]
         logging.info(f'-- Loading dataset {table_name}')
 
-        df_nodes = self.DM.import_graph_data_from_tables(
-            table_name, sampling_factor=0.1)
+        df_nodes, source_metadata = self.DM.import_graph_data_from_tables(
+            table_name, sampling_factor)
+
+        # Load labels of features from the corpus metadata
+        T_labels = None
+        if 'feature_labels' in source_metadata:
+            T_labels = source_metadata['feature_labels']
 
         # Take feature matrix from embeddings
         T = np.array(df_nodes['embeddings'].tolist())
@@ -1008,13 +1030,13 @@ class SgTaskManager(object):
         # Remove embeddings from df_nodes
         df_nodes.drop(columns='embeddings', inplace=True)
 
-        nodes = df_nodes['id'].tolist()
+        # nodes = df_nodes['id'].tolist()
 
         # Take a random sample
         if n0 <= 0:
-            n_gnodes = len(nodes)
+            n_gnodes = len(df_nodes)
         elif n0 < 1:
-            n_gnodes = int(n0 * len(nodes))
+            n_gnodes = int(n0 * len(df_nodes))
         else:
             n_gnodes = int(n0)
 
@@ -1022,7 +1044,8 @@ class SgTaskManager(object):
         # LOAD DATA INTO NEW SNODE
 
         # Create datagraph with the full feature matrix
-        self.SG.makeSuperNode(label=table_name, nodes=nodes, T=T, save_T=True)
+        self.SG.makeSuperNode(label=table_name, nodes=df_nodes, T=T,
+                              save_T=True, T_labels=T_labels)
         self.SG.sub_snode(table_name, n_gnodes, ylabel=table_name,
                           sampleT=True, save_T=True)
 
@@ -1554,6 +1577,37 @@ class SgTaskManager(object):
 
         return
 
+    def filter_edges(self, path):
+        """
+        Subsample graph
+
+        Parameters
+        ----------
+        path : str
+            Path to graph
+        mode : str
+            If 'newgraph', create a new snode with the subgraph
+        """
+
+        # Create graph object
+        logging.info(f'-- Loading GRAPH from {path}')
+        graph_name = path.split(os.path.sep)[-1]
+
+        # Number of target nodes.
+        if not self.SG.is_active_snode(graph_name):
+            self.SG.activate_snode(graph_name)
+        print(self.SG.snodes[graph_name].df_edges['Weight'])
+        smin = min(self.SG.snodes[graph_name].df_edges['Weight'])
+
+        th = float(input(f"Select threshold [{smin}]: ") or smin)
+
+        self.SG.filter_edges_from_snode(graph_name, th)
+
+        self.SG.save_supergraph()
+        self._deactivate()
+
+        return
+
     def largest_community_subgraph(self, path, comm):
         """
         Subsample graph taking the nodes from the largest community.
@@ -1685,13 +1739,36 @@ class SgTaskManager(object):
 
         return
 
+    def label_nodes_from_feature_labels(self, path):
+        """
+        Reads feature labels from the corpus metadata and assigns labels to
+        nodes with feature vector according to their dominating features
+
+        Parameters
+        ----------
+        path : str
+            Path to snode
+        """
+
+        # Get snode name
+        graph = path.split(os.path.sep)[-1]
+
+        self.SG.label_nodes_from_features(graph)
+
+        # Save modified snode
+        self.SG.save_supergraph()
+        # Deactivate snode
+        self._deactivate()
+
+        return
+
     # ###############
     # Graph inference
     # ###############
     def equivalence_graph(self, path):
         """
         This method manages the equivalence graph, which is a graph that
-        connects all nodes with the same topic vector into its equivalence
+        connects all nodes with the same feature vector into its equivalence
         class.
 
         Parameters
@@ -1741,8 +1818,9 @@ class SgTaskManager(object):
         (semantic) graph.
 
         It is similar to a concatenatio of self.equivalence_graph() (to
-        transform the original topic matrix into the reduced matrix without row
-        repetitions) and infer_sim_graph() (to compute the similarity graph)
+        transform the original feature matrix into the reduced matrix without
+        row repetitions) and infer_sim_graph() (to compute the similarity
+        graph)
 
         Parameters
         ----------
@@ -2139,7 +2217,7 @@ class SgTaskManager(object):
             e_label = s_label + '_2_' + t_label
 
         self.SG.snode_from_atts(s_label, attribute, target=t_label,
-                                e_label=e_label)
+                                e_label=e_label, save_T=True)
 
         self.SG.save_supergraph()
         # Clean memory:
@@ -2422,6 +2500,37 @@ class SgTaskManager(object):
         graph_name = path2snode.split(os.path.sep)[-1]
 
         self.SG.graph_layout(graph_name, attribute, gravity=gravity)
+
+        # ############
+        # SAVE RESULTS
+
+        # Save graph: nodes and edges
+        self.SG.save_supergraph()
+        # Reset active snodes or sedges. This is to save memory.
+        self._deactivate()
+
+        return
+
+    # ###################
+    # Graph visualization
+    # ###################
+    def display_graph(self, path2snode, attribute):
+        """
+        Display the graph using matplotlib
+
+        Parameters
+        ----------
+        path2snode : str
+            Path to snode
+        attribute: str
+            Snode attribute used to color the graph
+        """
+
+        # Create graph obje
+        logging.info(f'-- Loading GRAPH from {path2snode}')
+        graph_name = path2snode.split(os.path.sep)[-1]
+
+        self.SG.display_graph(graph_name, attribute)
 
         # ############
         # SAVE RESULTS

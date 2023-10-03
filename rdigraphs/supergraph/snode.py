@@ -20,8 +20,11 @@ from scipy.sparse import csr_matrix, identity, save_npz, load_npz, issparse
 import networkx as nx
 import networkx.algorithms as nxalg
 
-import matplotlib
-matplotlib.use("Agg")
+# import matplotlib
+import matplotlib.pyplot as plt
+# This is to avoid plotting. The figure is generated and saved in file.
+# matplotlib.use("Agg")
+
 import seaborn as sns
 
 # Graph layout.
@@ -31,8 +34,8 @@ import seaborn as sns
 try:
     from fa2 import ForceAtlas2   # "pip install fa2"
 except Exception:
-    print("WARNING: fa2 could not be imported."
-          "Force-atlas layout not available")
+    logging.warning("WARNING: fa2 could not be imported."
+                    "Force-atlas layout not available")
 
 # Local imports
 from rdigraphs.sim_graph.sim_graph import SimGraph
@@ -91,7 +94,6 @@ class DataGraph(object):
         self.T = None         # Feature matrix, one row per node
         self.Teq = None       # Equivalent T (will merge equal rows in T)
         self.save_T = False   # By default, feature matrix will not be saved
-        self.B = None      # Binary sparse feature matrix, one row per node
         # The following is the name of the column in self.df_nodes that will
         # contain the node identifiers. It is actually a constant, because it
         # is not modified inside the class (and there is no clear reason to
@@ -481,6 +483,16 @@ class DataGraph(object):
 
         return
 
+    def get_feature_labels(self):
+        """
+        Returns the list of feature labels, if they exist. Otherwise, None.
+        """
+
+        if 'feature_labels' in self.metadata:
+            return self.metadata['feature_labels']
+        else:
+            return None
+
     # #####################
     # Graph edition methods
     # #####################
@@ -643,7 +655,8 @@ class DataGraph(object):
 
         return
 
-    def set_nodes(self, nodes=None, T=None, save_T=False):
+    def set_nodes(self, nodes=None, T=None, save_T=False, T_labels=None,
+                  col_id='Id'):
         '''
         Add nodes to datagraph.
 
@@ -651,14 +664,19 @@ class DataGraph(object):
 
         Parameters
         ----------
-        nodes : list or None, optional (default=None)
-            A list of node identifiers
+        nodes : list or pandas.DataFrame or None, optional (default=None)
+            If list, a list of node identifiers
+            If dataframe, a table of node identifiers and attributes
             If None, integer identifiers will be assigned
         T : array (n_nodes, n_features) or None, optional (default=None)
             A matrix of feature vectors: one row per node, one column per
             feature.
         save_T : bool, optional (default=False)
             If True, the feature matrix T is saved into an npz file.
+        T_labels : dict or None, optional (default=None)
+            A sorted list of labels assigned to features
+        col_id : str, optional (default='id')
+            Name of the column of node names (only if nodes is a dataframe)
         '''
 
         # This is just a marker to indicate the graph saver to save the
@@ -681,10 +699,20 @@ class DataGraph(object):
 
         # Save nodes in the object variables
         self.n_nodes = len(nodes)
+
         logging.info(
             f'-- -- Uploading {self.n_nodes} nodes to graph {self.label}.')
-        self.nodes = nodes
-        self.df_nodes = pd.DataFrame(nodes, columns=[self.REF])
+
+        if isinstance(nodes, list):
+            self.nodes = nodes
+            self.df_nodes = pd.DataFrame(nodes, columns=[self.REF])
+
+        else:
+            # Read nodes from a dataframe
+            self.df_nodes = nodes
+            # Change name of column with node ids to the standard name.
+            self.df_nodes.rename(columns={col_id: self.REF}, inplace=True)
+            self.nodes = self.df_nodes[self.REF].tolist()
 
         if T is not None:
             # Check consistency between nodes and features
@@ -705,6 +733,9 @@ class DataGraph(object):
 
         # Re-build metadata dictionary
         self.update_metadata()
+        # Add feature labels:
+        if T_labels is not None:
+            self.metadata['feature_labels'] = T_labels
 
         return
 
@@ -753,7 +784,7 @@ class DataGraph(object):
 
         return
 
-    def add_feature_matrix(self, T, save_T=None):
+    def add_feature_matrix(self, T, T_labels=None, save_T=None):
         '''
         Add feature matrix to datagraph.
 
@@ -762,8 +793,10 @@ class DataGraph(object):
         T : array (n_nodes, n_features) or None, optional (default=None)
             A matrix of feature vectors: one row per node, one column per
             feature.
+        T_labels : list of str or None, optional (default=None)
+            List of labels associated to the feature matrix
         save_T : bool, optional (default=False)
-            If True, the feature matrix T is saved into an  npz file.
+            If True, the feature matrix T will be saved into an npz file.
         '''
 
         # This is just a marker to indicate the graph saver to save the
@@ -772,11 +805,24 @@ class DataGraph(object):
             self.save_T = save_T
 
         # Check consistency between nodes and features
-        if T.shape[0] == self.n_nodes:
-            self.T = T
-        else:
+        if T.shape[0] != self.n_nodes:
             logging.error("-- -- The number of nodes must be equal to the "
                           "number of rows in the feature matrix")
+            return
+
+        # Load feature matrix
+        self.T = T
+
+        # Load feature labels
+        if T_labels is not None:
+            # Check consistency between feature vector dimension and number of
+            # feature labels
+            if len(T_labels) == T.shape[1]:
+                self.metadata['feature_labels'] = T_labels
+            else:
+                logging.error(
+                    "-- -- The number of elements in T_labels must be equal "
+                    "to the number of columns in feature matrix T")
 
         return
 
@@ -839,8 +885,8 @@ class DataGraph(object):
             the snode.
         fill_value : None, scalar or dict, optional (default=None)
             Specifies what to do with NaN values in the ouput dataframe
-            If None, there are not changed
-            If dict, fillna containg the value used to replace each column.
+            If None, they are not changed
+            If dict, fillna contains the value used to replace each column.
             If scalar, all NaN's are replaced by the given scalar value
         """
 
@@ -910,6 +956,37 @@ class DataGraph(object):
 
         # Update list of current attributes in the metadata dictionary
         self.update_metadata()
+
+        return
+
+    def label_nodes_from_features(self, att='tag'):
+        """
+        Labels each node in the graph according to the labels of its dominant
+        features.
+
+        Parameters
+        ----------
+        att : str, optional (default='tag')
+            Name of the column in df_nodes that will store the labels
+        """
+
+        T_labels = self.metadata['feature_labels']
+
+        # Transform the feature matrix into a list of indices of the rows
+        # over a given threshold
+        th = 2.5 / len(T_labels)
+
+        # Sort indices of the dominant features per node
+        top_features = np.argsort(- self.T)
+
+        # Map indices to labels, node by node
+        labels = []
+        for n, top_n in enumerate(top_features):
+            label_n = ', '.join([T_labels[f] for f in top_n
+                                 if self.T[n, f] > th])
+            labels.append(label_n)
+        # Add labels to new attribute
+        self.add_attributes(att, labels)
 
         return
 
@@ -1036,6 +1113,7 @@ class DataGraph(object):
         """
 
         # Remove edges
+
         self.df_edges = self.df_edges[self.df_edges['Weight'] >= th]
 
         # Update redundant snode attributes
@@ -1364,6 +1442,12 @@ class DataGraph(object):
         This method is useful to align different graphs that may have the same
         nodes but in different orders. Using the same order is necessary to
         make consistent operations between graph matrices.
+
+        Notes
+        -----
+        WARNING: this version does not apply the re-ordering to the feature
+                 matrix. To avoid using the original feature matrix, it is
+                 removed.
         """
 
         # Sort nodes in dataframe
@@ -1372,6 +1456,12 @@ class DataGraph(object):
         self.nodes = self.df_nodes[self.REF].tolist()
         # Update list of edge indices
         self._df_edges_2_atts()
+
+        # Remove feature matrix, if it exists
+        # FIXME: do not remove but reorder feature meatrix
+        self.remove_feature_matrix()
+        logging.warning("-- -- Nodes has been sorted. Be aware that the "
+                        "feature matrix, if any has been removed")
 
         return
 
@@ -1618,6 +1708,15 @@ class DataGraph(object):
             Name of the node attribute that will contain the local parameter
         """
 
+        # Check if parameter is available.
+        valid_params = [
+            'centrality', 'degree', 'betweenness', 'closeness', 'pageRank',
+            'cluster_coef', 'katz', 'abs_in_degree', 'abs_out_degree']
+        if parameter not in valid_params:
+            logging.warning(f"-- Parameter {parameter} not available. No "
+                            "action taken")
+            return
+
         # Start
         t0 = time()       # Time control
         logging.info(f'-- Computing {parameter} for all nodes in the graph')
@@ -1634,94 +1733,103 @@ class DataGraph(object):
         # ##################
         # Select data matrix
 
-        # Get distance matrix
-        # Compute a sparse distance matrix from a list of affinity values
-        D = self._computeD()
+        # Methods that intepret weights as distances
+        if parameter in ['betweenness', 'closeness', 'load', 'harmonic']:
+            # Compute a sparse distance matrix from a list of affinity values
+            W = self._computeD()
+
+        # Methods that intepret weights as connection strengths
+        elif parameter in ['centrality', 'degree', 'abs_in_degree',
+                           'abs_out_degree', 'cluster_coef', 'katz',
+                           'pageRank']:
+            # Get distance matrix
+            # Compute a sparse affinity matrix from a list of affinity values
+            W = self._computeK()
+
+        # ###################
+        # Make networkX graph
+        if (not hasattr(self, 'edge_class')
+                or self.edge_class == 'undirected'):
+            G = nx.from_scipy_sparse_matrix(W)
+        else:
+            G = nx.from_scipy_sparse_matrix(W, create_using=nx.DiGraph())
 
         # ############################################
         # Local graph analysis algorithms
 
-        # Apply the clustering algorithm
-        if parameter in ['centrality', 'degree', 'betweenness', 'closeness',
-                         'pageRank', 'cluster_coef', 'katz', 'abs_in_degree',
-                         'abs_out_degree']:
+        if parameter == 'centrality':
+            # C = nxalg.eigenvector_centrality(
+            #     G, max_iter=200, tol=1e-07, nstart=None, weight='weight')
+            #    G, max_iter=100, tol=1e-06, nstart=None, weight='weight')
+            print("Computing numpy centrality")
+            C = nxalg.eigenvector_centrality_numpy(
+                G, weight='weight', max_iter=100, tol=0)
 
-            if (not hasattr(self, 'edge_class')
-                    or self.edge_class == 'undirected'):
-                G = nx.from_scipy_sparse_matrix(D)
+        elif parameter == 'degree':
+            if self.edge_class == 'directed':
+                C = nxalg.out_degree_centrality(G)
             else:
-                G = nx.from_scipy_sparse_matrix(D, create_using=nx.DiGraph())
+                C = nxalg.degree_centrality(G)
 
-            if parameter == 'centrality':
-                # C = nxalg.eigenvector_centrality(
-                #     G, max_iter=200, tol=1e-07, nstart=None, weight='weight')
-                #    G, max_iter=100, tol=1e-06, nstart=None, weight='weight')
-                print("Computing numpy centrality")
-                C = nxalg.eigenvector_centrality_numpy(
-                    G, weight='weight', max_iter=100, tol=0)
+        elif parameter == 'abs_in_degree':
+            C = dict(G.in_degree())
 
-            elif parameter == 'degree':
-                if self.edge_class == 'directed':
-                    C = nxalg.out_degree_centrality(G)
-                else:
-                    C = nxalg.degree_centrality(G)
+        elif parameter == 'abs_out_degree':
+            C = dict(G.out_degree())
 
-            elif parameter == 'abs_in_degree':
-                C = dict(G.in_degree())
+        elif parameter == 'betweenness':
+            C = nxalg.betweenness_centrality(
+                G, k=3, normalized=True, weight='weight', endpoints=False,
+                seed=None)
 
-            elif parameter == 'abs_out_degree':
-                C = dict(G.out_degree())
+        elif parameter == 'load':
+            C = nxalg.load_centrality(
+                G, v=None, cutoff=None, normalized=True, weight='weight')
 
-            elif parameter == 'betweenness':
-                C = nxalg.betweenness_centrality(
-                    G, k=3, normalized=True, weight='weight', endpoints=False,
-                    seed=None)
+        elif parameter == 'closeness':
+            logging.info('   Be patient. This may take some time...')
+            C = nxalg.centrality.closeness_centrality(
+                G, u=None, distance='weight', wf_improved=True)
 
-            elif parameter == 'closeness':
-                logging.warning('   Be patient. This may take some time...')
-                C = nxalg.centrality.closeness_centrality(
-                    G, u=None, distance=None, wf_improved=True)
+        elif parameter == 'cluster_coef':
+            logging.info('   Be patient. This may take some time...')
+            C = nxalg.clustering(G, nodes=None, weight='weight')
 
-            elif parameter == 'cluster_coef':
-                logging.warning('   Be patient. This may take some time...')
-                C = nxalg.clustering(G, nodes=None, weight='weight')
+        elif parameter == 'pageRank':
+            # See also pagerank_numpy and pagerank_scipy
+            C = nxalg.pagerank(
+                G, alpha=0.85, personalization=None, max_iter=100,
+                tol=1e-06, nstart=None, weight='weight', dangling=None)
 
-            elif parameter == 'pageRank':
-                # See also pagerank_numpy and pagerank_scipy
-                C = nxalg.pagerank(
-                    G, alpha=0.85, personalization=None, max_iter=100,
-                    tol=1e-06, nstart=None, weight='weight', dangling=None)
+        elif parameter == 'katz':
+            # This causes memory overflow for large graphs
+            # alpha = 0.5 / max(nx.adjacency_spectrum(G))
+            # This may fail if the largest eigenvector is < 0.1
+            alpha = 0.1
+            C = nxalg.katz_centrality(
+                G, alpha=alpha, beta=1.0, max_iter=1000, tol=1e-06,
+                nstart=None, normalized=True, weight='weight')
 
-            elif parameter == 'katz':
-                # This causes memory overflow for large graphs
-                # alpha = 0.5 / max(nx.adjacency_spectrum(G))
-                # This may fail if the largest eigenvector is < 0.1
-                alpha = 0.1
-                C = nxalg.katz_centrality(
-                    G, alpha=alpha, beta=1.0, max_iter=1000, tol=1e-06,
-                    nstart=None, normalized=True, weight='weight')
+        elif parameter == 'harmonic':
+            C = nxalg.harmonic_centrality(
+                G, nbunch=None, distance='weight', sources=None)
 
-            # ########################
-            # Store model in dataframe
-            self.add_attributes(parameter, C.values())
+        # ########################
+        # Store model in dataframe
+        self.add_attributes(parameter, C.values())
 
-            # ###############
-            # Update metadata
-            if 'local_features' not in self.metadata:
-                self.metadata['local_features'] = {}
-            self.lg_report = {'feature_name': parameter}
-            self.metadata['local_features'].update({label: self.lg_report})
-            self.metadata['local_features'][label].update(
-                {'time': time() - t0})
+        # ###############
+        # Update metadata
+        if 'local_features' not in self.metadata:
+            self.metadata['local_features'] = {}
+        self.lg_report = {'feature_name': parameter}
+        self.metadata['local_features'].update({label: self.lg_report})
+        self.metadata['local_features'][label].update(
+            {'time': time() - t0})
 
-            # End message
-            tm = self.metadata['local_features'][label]['time']
-            logging.info(f"-- {parameter} computed in {tm} seconds")
-
-        else:
-
-            logging.info(f"-- Parameter {parameter} not available. No action "
-                         "taken")
+        # End message
+        tm = self.metadata['local_features'][label]['time']
+        logging.info(f"-- {parameter} computed in {tm} seconds")
 
         return
 
@@ -1770,9 +1878,10 @@ class DataGraph(object):
         return q
 
     def graph_layout(self, alg='fa2', color_att=None, gravity=1,
-                     save_gexf=True):
+                     save_gexf=True, display_graph=True):
         """
-        Compute the layout of the given graph
+        Compute the layout of the given graph and save the node positions as
+        attributes
 
         Parameters
         ----------
@@ -1785,9 +1894,8 @@ class DataGraph(object):
             Gravity parameter (only for force atlas 2)
         save_gexf : bool, optional (default=True)
             If True, the graph layout is exported to a gexf file
-            It False,  the node positions are stord as columns in self.df_nodes
-            (note that positions are not saved in self.df_nodes if
-            save_gexf=True)
+        display_graph : bool, optinal (default=True)
+            If True, the graph is plot and saved in a png file
         """
 
         # Start clock
@@ -1831,6 +1939,14 @@ class DataGraph(object):
                 threshold=0.0001, weight='weight', scale=1, center=None, dim=2,
                 seed=None)
 
+        # Store positions in nodes dataframe
+        # This might be unnecessary if the graph will be save in gexf
+        x, y = list(zip(*positions.values()))
+        self.add_attributes(['x', 'y'], [x, y])
+
+        # #########################
+        # Export graph to gexf file
+
         # Get attributes to map to colors
         if color_att:
             node_attribs = self.df_nodes[color_att].tolist()
@@ -1840,7 +1956,7 @@ class DataGraph(object):
             # attributes
             n_colors = len(uniq_attribs)
             palette = sns.color_palette(n_colors=n_colors)
-            # Map palette of [0,1]-components to a paletter of 0-255 comps.
+            # Map palette of [0,1]-components to a palette of 0-255 comps.
             palette = [[int(255.999 * x) for x in row] for row in palette]
 
             # Map attribute values to rgb colors
@@ -1864,29 +1980,90 @@ class DataGraph(object):
                                               'b': node_colors[n][2],
                                               'a': 1}
 
-        # ###############
-        # Update metadata
-        tm = time() - t0
-        self.metadata['graph_layout'] = {'algorithm': 'Force Atlas 2',
-                                         'time': tm}
         # ######
         # Saving
 
         if save_gexf:
-            # Save graph in file
-            if not self.path2graph.is_dir():
-                self.path2graph.mkdir()
+            self.save_gexf(G)
 
-            path = self.path2graph / (self.label + '.gexf')
-            nx.write_gexf(G, path)
-        else:
-            # Store positions in nodes dataframe
-            # This might be unnecessary if the graph will be save in gexf
-            x, y = list(zip(*positions.values()))
-            self.add_attributes(['x', 'y'], [x, y])
+        # ###############
+        # Update metadata
+        tm = time() - t0
+        self.metadata['graph_layout'] = {'algorithm': alg,
+                                         'time': tm}
 
         # End message
         logging.info(f'-- -- Graph layout computed in {tm} seconds')
+
+        return
+
+    def display_graph(self, color_att=None):
+        """
+        Display the given graph using matplolib
+
+        Parameters
+        ----------
+        color_att : str or None, optional (default=None)
+            Name of the attribute in self.df_nodes to use as color index
+        """
+
+        # ##################################
+        # Transform graph to networkx format
+
+        # Compute a sparse affinity matrix from a list of affinity values
+        K = self._computeK(diag=False)
+        # Convert matrix into graph
+        G = nx.from_scipy_sparse_matrix(K)
+
+        # Read positions
+        df_xy = self.df_nodes.loc[:, ['x', 'y']]
+        positions = df_xy.T.to_dict('list')
+
+        # #########################
+        # Export graph to gexf file
+
+        # Get attributes to map to colors
+        if color_att:
+            node_attribs = self.df_nodes[color_att].tolist()
+            uniq_attribs = list(set(node_attribs))  # List of unique attributes
+
+            # Get a palette of rgb colors as large as the list of unique
+            # attributes
+            n_colors = len(uniq_attribs)
+            palette = sns.color_palette(n_colors=n_colors)
+            # Map palette of [0,1]-components to a palette of 0-255 comps.
+            palette = [[int(255.999 * x) for x in row] for row in palette]
+
+            # Map attribute values to rgb colors
+            attrib_2_idx = dict(zip(uniq_attribs, palette))
+
+            # Map node attribute to rgb colors
+            node_colors = [attrib_2_idx[a] for a in node_attribs]
+
+        # Get list of degrees
+        degrees = [150 * val for (node, val) in G.degree()]
+
+        # #############
+        # Graph display
+
+        # Recompute colors in 0-1 scale
+        palette = sns.color_palette(n_colors=n_colors)
+        # Map attribute values to rgb colors
+        attrib_2_idx = dict(zip(uniq_attribs, palette))
+        # Map node attribute to rgb colors
+        node_colors = [attrib_2_idx[a] for a in node_attribs]
+
+        # This is to avoid multiple findfont log messages from matplotlib.
+        logging.getLogger('matplotlib.font_manager').disabled = True
+        plt.figure(figsize=(10, 10))
+        nx.draw(G, positions, node_size=degrees, node_color=node_colors,
+                width=1, with_labels=True)
+
+        # Save tofile
+        path = self.path2graph / (self.label + '.png')
+        # plt.title(f"Graph {self.label}. Color attribute {color_att}")
+        plt.savefig(path)
+        plt.show(block=False)
 
         return
 
@@ -1945,6 +2122,21 @@ class DataGraph(object):
 
         return
 
+    def remove_feature_matrix(self):
+        """
+        Removes feature matrix from graph, if it exists
+        """
+
+        self.T = None
+        self.save_T = False
+        if self.has_saved_features():
+            if self.path2T.is_file():
+                self.path2T.unlink()
+            elif self.path2T_old.is_file():
+                self.path2T_old.unlink()
+
+        return
+
     def save_metadata(self):
         """
         Save metadata dictionary in yml file.
@@ -1968,3 +2160,13 @@ class DataGraph(object):
 
         return
 
+    def save_gexf(self, G):
+
+        # Save graph in file
+        if not self.path2graph.is_dir():
+            self.path2graph.mkdir()
+
+        path = self.path2graph / (self.label + '.gexf')
+        nx.write_gexf(G, path)
+
+        return
