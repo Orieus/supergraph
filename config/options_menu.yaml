@@ -22,6 +22,7 @@ root:
     - community_metric
     - compare_communities
     - display_graphs
+    - export_graphs
 
 # In the following, each menu option is described.
 # GENERIC FORMAT OF AN OPTION DESCRIPTOR:
@@ -189,6 +190,11 @@ display_graphs:
     - display_graph
     - display_bigraph
 
+export_graphs:
+  title: Export graph data to parquet files
+  options:
+   - path: graphs
+
 # #############################################################################
 # LEVEL 2
 # #############################################################################
@@ -256,8 +262,8 @@ manage_Neo4J:
   options:
     - showGDBdata
     - resetGDB
-    - export_graph
-    - export_bigraph
+    - export_graph_2_neo4J
+    - export_bigraph_2_neo4J
 
 # ##########################
 # Options for graph previews
@@ -462,7 +468,7 @@ resetGDB:
     - reset_Neo4J_snode
     - reset_Neo4J_sedge
 
-export_graph:
+export_graph_2_neo4J:
   title: Export graphs to Neo4J
   options:
     - path: graphs
@@ -473,7 +479,7 @@ export_graph:
         AU: Author
         Org: Organization
 
-export_bigraph:
+export_bigraph_2_neo4J:
   title: Export bigraph to Neo4J
   options:
     - path: bigraphs

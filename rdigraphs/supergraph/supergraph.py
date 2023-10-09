@@ -1874,21 +1874,28 @@ class SuperGraph(object):
 
         return
 
-    def label_nodes_from_features(self, graph_name):
+    def label_nodes_from_features(self, graph_name, att='tag', thp=2.5):
         """
         Labels each node in the graph according to the labels of its dominant
-        features
+        features.
 
         Parameters
         ----------
         graph_name : str
             Name of the graph
+        att : str, optional (default='tag')
+            Name of the column in df_nodes that will store the labels
+        thp : float, optional (default=2.5)
+            Parameter of the threshold. The threshold is computed as thp / nf,
+            where nf is the number of features. Assuming probabilistic
+            features, thp represents how large must be a feature value wrt the
+            the value of a flat feature vector (i.e. 1/nf) to be selected.
         """
 
         if not self.is_active_snode(graph_name):
             self.activate_snode(graph_name)
 
-        self.snodes[graph_name].label_nodes_from_features()
+        self.snodes[graph_name].label_nodes_from_features(att=att, thp=thp)
 
         return
 
@@ -1952,7 +1959,7 @@ class SuperGraph(object):
 
         return
 
-    def graph_layout(self, snode_label, attribute, gravity=1):
+    def graph_layout(self, snode_label, attribute, gravity=1, alg='fa2'):
         """
         Compute the layout of the given graph
 
@@ -1971,26 +1978,45 @@ class SuperGraph(object):
             self.activate_snode(snode_label)
 
         self.snodes[snode_label].graph_layout(
-            color_att=attribute, gravity=gravity)
+            alg=alg, color_att=attribute, gravity=gravity)
 
         return
 
-    def display_graph(self, snode_label, attribute):
+    def display_graph(self, snode_label, attribute, node_size=None,
+                      edge_width=None, show_labels=None):
         """
-        Display the graph using matplotlib
+        Display the given graph using matplolib
 
+        Parameters
+        ----------
         Parameters
         ----------
         snode_label : str
             Name of the snode
         attribute: str
             Snode attribute used to color the graph
+        node_size : int or None, optional (defautl=None)
+            Size of a degree-1 node in the graph. If None, a value is
+            automatically assigned in proportion to the log number of nodes
+        edge_width : int or None, optional (defautl=None)
+            Edge width. If None, a value is automatically assigned in
+            proportion to the log number of nodes
+        show_labels : bool or None, optional (defautl=None)
+            If True, label nodes are show. If None, labels are shown for graphs
+            with less than 100 nodes only.
+        """
+
+        """
+        Display the graph using matplotlib
+
         """
 
         if not self.is_active_snode(snode_label):
             self.activate_snode(snode_label)
 
-        self.snodes[snode_label].display_graph(color_att=attribute)
+        self.snodes[snode_label].display_graph(
+            color_att=attribute, node_size=None, edge_width=None,
+            show_labels=None)
 
         return
 
@@ -2162,6 +2188,27 @@ class SuperGraph(object):
             self.sedges[s].saveGraph()
 
         self.save_metagraph()
+
+        return
+
+    def export_2_parquet(self, snode_label, path2nodes, path2edges):
+        """
+        Export the nodes and edges of a given snode to parquet files
+
+        Parameters
+        ----------
+        snode_label: str
+            Nambe of the snode
+        path2nodes : str or pathlib.Path
+            Path to the output file of nodes
+        path2edges : str or pathlib.Path
+            Path to the output file of edges
+        """
+
+        if not self.is_active_snode(snode_label):
+            self.activate_snode(snode_label)
+
+        self.snodes[snode_label].export_2_parquet(path2nodes, path2edges)
 
         return
 

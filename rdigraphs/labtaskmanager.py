@@ -33,7 +33,7 @@ from rdigraphs.community_plus.community_plus import CommunityPlus
 import matplotlib.pyplot as plt
 
 
-class LabTaskManager(SgTaskManager):
+class LabTaskManager(SgTaskManagerCMD):
     """
     Task Manager for the RDIgraph analyzer.
 

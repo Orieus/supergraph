@@ -266,8 +266,9 @@ class DataManager(object):
 
         return table_list
 
-    def import_graph_data_from_tables(self, table_name, sampling_factor=1,
-                                      col_id='Id'):
+    def import_graph_data_from_tables(
+            self, table_name, sampling_factor=1, col_id='Id', params={},
+            load_feather=False, save_feather=False):
         """
         Loads a dataframe of documents from one or several files in tabular
         format.
@@ -284,6 +285,15 @@ class DataManager(object):
 
         col_id : str, optional (default='Id')
             Name of the column with tne node names in the output dataframe
+
+        params : dict, optional (default={})
+            Dictionary of parameters (specific o the dataset)
+
+        load_feather : bool, optional (default=False)
+            If True, data are imported from a feather file, if available
+
+        save_feather : bool, optional (default=False)
+            If True, dataframe is saved to a feather file
 
         Returns
         -------
@@ -304,7 +314,7 @@ class DataManager(object):
 
         # #################################################
         # Load corpus data from feather file (if it exists)
-        if path2feather.is_file():
+        if load_feather and path2feather.is_file():
 
             logging.info(f'-- -- Feather file {path2feather} found...')
             df_table = pd.read_feather(path2feather)
@@ -396,14 +406,29 @@ class DataManager(object):
             # 'orgContr', 'coordinatorCountry', 'coordinatorOrg',
             # 'euroSciVocCode', 'publicationID', 'patentID', 'Kwd_count',
             # 'topics10', 'topics26'
-            selected_cols = [
-                'projectID', 'acronym', 'title', 'startDate', 'endDate',
-                'totalCost', 'ecMaxContribution', 'topics26']
+            if 'select_all' in params and params['select_all']:
+                selected_cols = [
+                    'projectID', 'acronym', 'status', 'title', 'startDate',
+                    'endDate', 'totalCost', 'ecMaxContribution',
+                    'ecSignatureDate', 'frameworkProgramme', 'masterCall',
+                    'subCall', 'fundingScheme', 'nature', 'objective',
+                    'contentUpdateDate', 'rcn', 'grantDoi', 'topic',
+                    'topic_title', 'countryContr', 'orgContr',
+                    'coordinatorCountry', 'coordinatorOrg', 'euroSciVocCode',
+                    'publicationID', 'patentID', 'Kwd_count']
+            else:
+                selected_cols = [
+                    'projectID', 'acronym', 'title', 'startDate', 'endDate',
+                    'totalCost', 'ecMaxContribution', 'topics26']
+            if 'n_topics' not in params:
+                params['n_topics'] = 'topics26'  # topics10 is the other optiun
+            selected_cols.append(params['n_topics'])
+
             df_table = df_table[selected_cols]
 
             # Map column names to normalized names
             mapping = {'projectID': col_id,
-                       'topics26': 'embeddings'}
+                       params['n_topics']: 'embeddings'}
             df_table.rename(columns=mapping, inplace=True)
 
         else:
@@ -457,7 +482,8 @@ class DataManager(object):
         # Save to feather file
         logging.info(f"-- -- Corpus {table_name} with {len(df_table)} "
                      f" documents loaded in {time() - t0:.2f} secs.")
-        df_table.to_feather(path2feather)
+        if save_feather:
+            df_table.to_feather(path2feather)
         logging.info(f"-- -- Corpus saved in feather file {path2feather}")
 
         return df_table, self.metadata

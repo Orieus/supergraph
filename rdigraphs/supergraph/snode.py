@@ -959,7 +959,7 @@ class DataGraph(object):
 
         return
 
-    def label_nodes_from_features(self, att='tag'):
+    def label_nodes_from_features(self, att='tag', thp=2.5):
         """
         Labels each node in the graph according to the labels of its dominant
         features.
@@ -968,13 +968,18 @@ class DataGraph(object):
         ----------
         att : str, optional (default='tag')
             Name of the column in df_nodes that will store the labels
+        thp : float, optional (default=2.5)
+            Parameter of the threshold. The threshold is computed as thp / nf,
+            where nf is the number of features. Assuming probabilistic
+            features, thp represents how large must be a feature value wrt the
+            the value of a flat feature vector (i.e. 1/nf) to be selected.
         """
 
+        # Read feature labels
         T_labels = self.metadata['feature_labels']
 
-        # Transform the feature matrix into a list of indices of the rows
-        # over a given threshold
-        th = 2.5 / len(T_labels)
+        # Threshold to decide if a feature is relevant or not in a node
+        th = thp / len(T_labels)
 
         # Sort indices of the dominant features per node
         top_features = np.argsort(- self.T)
@@ -1935,9 +1940,9 @@ class DataGraph(object):
                 G, pos=None, iterations=2000)
         elif alg == 'fr':
             positions = nx.drawing.layout.spring_layout(
-                G, k=None, pos=None, fixed=None, iterations=5,
-                threshold=0.0001, weight='weight', scale=1, center=None, dim=2,
-                seed=None)
+                G, k=None, pos=None, fixed=None, iterations=50,
+                threshold=0.0001, weight='weight', scale=1, center=None,
+                dim=2, seed=None)
 
         # Store positions in nodes dataframe
         # This might be unnecessary if the graph will be save in gexf
@@ -1989,15 +1994,15 @@ class DataGraph(object):
         # ###############
         # Update metadata
         tm = time() - t0
-        self.metadata['graph_layout'] = {'algorithm': alg,
-                                         'time': tm}
+        self.metadata['graph_layout'] = {'algorithm': alg, 'time': tm}
 
         # End message
         logging.info(f'-- -- Graph layout computed in {tm} seconds')
 
         return
 
-    def display_graph(self, color_att=None):
+    def display_graph(self, color_att=None, node_size=None, edge_width=None,
+                      show_labels=None):
         """
         Display the given graph using matplolib
 
@@ -2005,7 +2010,25 @@ class DataGraph(object):
         ----------
         color_att : str or None, optional (default=None)
             Name of the attribute in self.df_nodes to use as color index
+        node_size : int or None, optional (defautl=None)
+            Size of a degree-1 node in the graph. If None, a value is
+            automatically assigned in proportion to the log number of nodes
+        edge_width : int or None, optional (defautl=None)
+            Edge width. If None, a value is automatically assigned in
+            proportion to the log number of nodes
+        show_labels : bool or None, optional (defautl=None)
+            If True, label nodes are show. If None, labels are shown for graphs
+            with less than 100 nodes only.
         """
+
+        # Estimate attribute values automatically
+        if node_size is None:
+            # size of a degree-1 node
+            node_size = 40000 / self.n_nodes**1.5
+        if edge_width is None:
+            edge_width = 0.1 + 2 / (1 + np.log10(self.n_edges))
+        if show_labels is None:
+            show_labels = self.n_nodes < 100
 
         # ##################################
         # Transform graph to networkx format
@@ -2041,7 +2064,7 @@ class DataGraph(object):
             node_colors = [attrib_2_idx[a] for a in node_attribs]
 
         # Get list of degrees
-        degrees = [150 * val for (node, val) in G.degree()]
+        degrees = [node_size * val for (node, val) in G.degree()]
 
         # #############
         # Graph display
@@ -2057,7 +2080,7 @@ class DataGraph(object):
         logging.getLogger('matplotlib.font_manager').disabled = True
         plt.figure(figsize=(10, 10))
         nx.draw(G, positions, node_size=degrees, node_color=node_colors,
-                width=1, with_labels=True)
+                width=edge_width, with_labels=show_labels, font_size=24)
 
         # Save tofile
         path = self.path2graph / (self.label + '.png')
@@ -2093,6 +2116,42 @@ class DataGraph(object):
                     self.df_edges.to_csv(self.path2edges, index=False,
                                          columns=self.df_edges.columns,
                                          sep=',', encoding='utf-8')
+                else:
+                    # This should never happen, but it is checked to avoid
+                    # catastrofic errors
+                    logging.error(
+                        "-- -- Mismatch error: the number of edges in "
+                        "metadata is not equal to the length of the edge list")
+                    exit()
+
+        if self.save_T:
+            self.save_feature_matrix()
+
+        self.save_metadata()
+
+        return
+
+    def export_2_parquet(self, path2nodes, path2edges):
+        """
+        Saves the datagraph in parquet files at the given locations
+        """
+
+        # Save nodes
+        if self.n_nodes > 0:
+            if len(self.df_nodes) == self.n_nodes:   # Cautionary test
+                self.save_nodes(path=path2nodes, fmt='parquet')
+            else:
+                # This should never happen, but it is checked to avoid
+                # catastrofic errors
+                logging.error(
+                    "-- -- Mismatch error: the number of nodes in metadata "
+                    "is not equal to the length of the node list")
+                exit()
+
+            # Save edges
+            if self.n_edges > 0:
+                if len(self.df_edges) == self.n_edges:    # Cautionary test
+                    self.df_edges.to_parquet(path2edges, index=False)
                 else:
                     # This should never happen, but it is checked to avoid
                     # catastrofic errors
@@ -2148,15 +2207,33 @@ class DataGraph(object):
 
         return
 
-    def save_nodes(self):
+    def save_nodes(self, path=None, fmt='csv'):
+        """
+        Saves dataframe of nodes into file
 
-        if not self.path2graph.is_dir():
-            self.path2graph.mkdir()
+        Parameters
+        ----------
+        path : str or pathlib.Path or None
+            Path to the output file. If none, the file is saved in the
+            standard path (in self.path2nodes)
+        fmt : str, optional (default='csv')
+            Format of the output file
+        """
+
+        if path is None:
+            if not self.path2graph.is_dir():
+                self.path2graph.mkdir()
+            path = self.path2nodes
 
         # Save nodes
-        self.df_nodes.to_csv(self.path2nodes, index=False,
-                             columns=self.df_nodes.columns,
-                             sep=',', encoding='utf-8')
+        if fmt == 'csv':
+            self.df_nodes.to_csv(path, index=False,
+                                 columns=self.df_nodes.columns,
+                                 sep=',', encoding='utf-8')
+        elif fmt == 'parquet':
+            self.df_nodes.to_parquet(path, index=False)
+        else:
+            logging.error("-- Unrecognized output format. Nodes not saved")
 
         return
 

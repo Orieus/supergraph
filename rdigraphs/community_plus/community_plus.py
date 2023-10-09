@@ -127,7 +127,7 @@ class CommunityPlus(object):
         return new_cluster_labels, cluster_sizes
 
     def detect_communities(self, edges, weights, n_nodes=None, alg='louvain',
-                           ncmax=None, resolution=1e100):
+                           ncmax=None, resolution=1):
         """
         Applies a Community Detection algorithm to the graph given by a list
         of edges and a list of weights.
@@ -146,8 +146,8 @@ class CommunityPlus(object):
             Number of clusters.
         alg : string, default='louvain
             Community detection algorithm.
-            It must be one of 'louvain', 'spectral', 'fastgreedy', 'walktrap',
-            'infomap' or 'labelprop'
+            It must be one of 'cc', 'louvain', 'spectral', 'fastgreedy',
+            'walktrap', 'infomap', 'labelprop' or 'leiden'
         resolution: float
             Resolution parameter of the Louvain algorithm
 
