@@ -1983,7 +1983,7 @@ class SuperGraph(object):
         return
 
     def display_graph(self, snode_label, attribute, node_size=None,
-                      edge_width=None, show_labels=None):
+                      edge_width=None, show_labels=None, path=None):
         """
         Display the given graph using matplolib
 
@@ -2004,6 +2004,9 @@ class SuperGraph(object):
         show_labels : bool or None, optional (defautl=None)
             If True, label nodes are show. If None, labels are shown for graphs
             with less than 100 nodes only.
+        path : str or None, optional (default=None)
+            Path to the file where the graph is saved. If None, a default path
+            is used.
         """
 
         """
@@ -2016,7 +2019,7 @@ class SuperGraph(object):
 
         self.snodes[snode_label].display_graph(
             color_att=attribute, node_size=None, edge_width=None,
-            show_labels=None)
+            show_labels=None, path=path)
 
         return
 

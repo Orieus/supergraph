@@ -2002,7 +2002,7 @@ class DataGraph(object):
         return
 
     def display_graph(self, color_att=None, node_size=None, edge_width=None,
-                      show_labels=None):
+                      show_labels=None, path=None):
         """
         Display the given graph using matplolib
 
@@ -2019,6 +2019,9 @@ class DataGraph(object):
         show_labels : bool or None, optional (defautl=None)
             If True, label nodes are show. If None, labels are shown for graphs
             with less than 100 nodes only.
+        path : str or pathlib.Path or None, optional (default=None)
+            Path to save the figure. If None, the figure is save in the same
+            folder as the graph, with a standard name
         """
 
         # Estimate attribute values automatically
@@ -2082,8 +2085,10 @@ class DataGraph(object):
         nx.draw(G, positions, node_size=degrees, node_color=node_colors,
                 width=edge_width, with_labels=show_labels, font_size=24)
 
-        # Save tofile
-        path = self.path2graph / (self.label + '.png')
+        # Save to file
+        if path is None:
+            path = self.path2graph / (self.label + '.png')
+        logging.info(f"-- -- Saving graph layout in path {path}")
         # plt.title(f"Graph {self.label}. Color attribute {color_att}")
         plt.savefig(path)
         plt.show(block=False)

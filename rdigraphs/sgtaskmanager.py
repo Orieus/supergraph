@@ -2395,7 +2395,7 @@ class SgTaskManager(object):
 
         return
 
-    def display_graph(self, path2snode, attribute):
+    def display_graph(self, path2snode, attribute, path=None):
         """
         Display the graph using matplotlib
 
@@ -2405,12 +2405,15 @@ class SgTaskManager(object):
             Path to snode
         attribute: str
             Snode attribute used to color the graph
+        path: pathlib.Path, str or None, optional (default=None)
+            Path to save the figure. If None, the figure is saved in a
+            default path.
         """
 
         # Create graph obje
         graph_name = path2snode.split(os.path.sep)[-1]
 
-        self.SG.display_graph(graph_name, attribute)
+        self.SG.display_graph(graph_name, attribute, path=path)
 
         # ############
         # SAVE RESULTS
