@@ -953,7 +953,7 @@ class SgTaskManager(object):
         sampling_factor : float, optional (default=1)
             Sampling factor.
         params : dict, optional (default={})
-            Dictionary of parameters (specific o the dataset)
+            Dictionary of parameters (specific of the dataset)
         load_feather : bool, optional (default=False)
             If True, data are imported from a feather file, if available
         save_feather : bool, optional (default=False)

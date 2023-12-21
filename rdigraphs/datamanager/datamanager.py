@@ -240,6 +240,9 @@ class DataManager(object):
         return
 
     def __update_metadata(self):
+        """
+        Updates the metadata yaml file with the content of self.metadata
+        """
 
         path2metadata = self.path2table / 'metadata.yaml'
         with open(path2metadata, 'w') as f:
@@ -248,6 +251,11 @@ class DataManager(object):
         return
 
     def __check_embeddings(self, columns):
+        """
+        Checks if the corpus has embeddings by checking if there is a column
+        named "embeddings". The metadata file is updated to indicate the
+        result.
+        """
 
         self.metadata["corpus_has_embeddings"] = bool(
             (np.array(columns) == 'embeddings').sum() > 0)
@@ -332,8 +340,8 @@ class DataManager(object):
 
         # By default, neither corpus cleaning nor language filtering are done
         clean_corpus = table_name in {
-            'SemanticScholar', 'SemanticScholar_emb',
-            'patstat', 'patstat_emb', 'Cordis_Kwds3_AI_topics'}
+            'SemanticScholar', 'SemanticScholar_emb', 'patstat', 'patstat_emb',
+            'Cordis_Kwds3_AI_topics', 'OA_DC_AI_topics'}
 
         if 'corpus' in self.metadata:
             path2texts = pathlib.Path(self.metadata['corpus'])
@@ -421,13 +429,40 @@ class DataManager(object):
                     'projectID', 'acronym', 'title', 'startDate', 'endDate',
                     'totalCost', 'ecMaxContribution', 'topics26']
             if 'n_topics' not in params:
-                params['n_topics'] = 'topics26'  # topics10 is the other optiun
+                params['n_topics'] = 'topics26'  # topics10 is the other option
             selected_cols.append(params['n_topics'])
 
             df_table = df_table[selected_cols]
 
             # Map column names to normalized names
             mapping = {'projectID': col_id,
+                       params['n_topics']: 'embeddings'}
+            df_table.rename(columns=mapping, inplace=True)
+
+        elif table_name in {'OA_DC_AI_topics'}:
+
+            # Remove unrelevant fields
+            # Available fields are: 'id', 'title', 'description', 'Kwd_count',
+            # 'doi', 'pmid', 'bestaccessrights', 'year', 'countries',
+            # 'funders', 'citations', 'LDA_40', 'LDA_100'
+
+            if 'select_all' in params and params['select_all']:
+                selected_cols = [
+                    'id', 'title', 'description', 'Kwd_count', 'doi', 'pmid',
+                    'bestaccessrights', 'year', 'countries', 'funders',
+                    'citations']
+            else:
+                selected_cols = [
+                    'id', 'title', 'description', 'doi', 'pmid', 'year',
+                    'countries', 'funders', 'citations']
+            if 'n_topics' not in params:
+                params['n_topics'] = 'LDA_40'  # LDA_100 is the other option
+            selected_cols.append(params['n_topics'])
+
+            df_table = df_table[selected_cols]
+
+            # Map column names to normalized names
+            mapping = {'id': col_id,
                        params['n_topics']: 'embeddings'}
             df_table.rename(columns=mapping, inplace=True)
 
@@ -465,9 +500,16 @@ class DataManager(object):
             logging.info(f"-- -- {l1 - l2} documents with empty title: "
                          "removed")
 
+        # If there is a column with embeddings, remove rows with no embeddings
+        if "embeddings" in df_table:
+            df_table = df_table[df_table['embeddings'].apply(
+                lambda x: len(x) > 0)]
+
         # Reset the index and drop the old index
         df_table = df_table.reset_index(drop=True)
 
+        # Add a flag to the metadata file indicating it there are embeddings
+        # in the table.
         self.__check_embeddings(df_table.columns)
 
         # This is not needed, it is just a test to verify that the loader
