@@ -432,7 +432,7 @@ class DataManager(object):
                 params['n_topics'] = 'topics26'  # topics10 is the other option
             selected_cols.append(params['n_topics'])
 
-            df_table = df_table[selected_cols]
+            df_table = df_table[selected_cols].copy()
 
             # Map column names to normalized names
             mapping = {'projectID': col_id,

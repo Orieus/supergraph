@@ -525,8 +525,7 @@ class DataGraph(object):
             # The input node is the first node in the graph
             self.df_nodes = pd.DataFrame([row])
         else:
-            self.df_nodes2 = self.df_nodes.append(row, ignore_index=True)
-            # Using pandas.concat() to add a row
+            # Add row to the dataframe of nodes
             new_row = pd.DataFrame(row, index=[0])
             self.df_nodes = pd.concat([self.df_nodes, new_row]).reset_index(
                 drop=True)
@@ -1574,7 +1573,8 @@ class DataGraph(object):
 
         return sg.cluster_ids, sg.Xeq
 
-    def detectCommunities(self, alg='louvain', ncmax=None, label='Comm'):
+    def detectCommunities(self, alg='louvain', ncmax=None, label='Comm',
+                          seed=None):
         """
         Applies a Community Detection algorithm to the current self graph given
         by the edges in self.edges and the weights in self.weights.
@@ -1592,7 +1592,9 @@ class DataGraph(object):
         ncmax : int or None, optional (default=None)
             Number of communities.
         label : str, optional (default='Comm')
-             Label for the cluster indices in the output dataframe
+            Label for the cluster indices in the output dataframe
+        seed : int or None (default=None)
+            Seed for randomization
         """
 
         # Start clock
@@ -1620,7 +1622,7 @@ class DataGraph(object):
         # Community detection algorithmm
         self.cluster_labels, self.cluster_sizes = self.CD.detect_communities(
             self.edge_ids, self.weights, n_nodes=self.n_nodes, alg=alg,
-            ncmax=ncmax, resolution=r)
+            ncmax=ncmax, resolution=r, seed=seed)
 
         # ######################
         # Order clusters by size
@@ -1911,8 +1913,20 @@ class DataGraph(object):
 
         # Compute a sparse affinity matrix from a list of affinity values
         K = self._computeK(diag=False)
-        # Convert matrix into graph
-        G = nx.from_scipy_sparse_matrix(K)
+
+        # Convert matrix into graph. 
+        # We try two options because nx has changed the name of the method
+        # in recent versions
+        try:
+            # The modern method
+            G = nx.from_scipy_sparse_array(K)
+            # We need to accept the deprecated method name from now on
+            # because force atlas uses it.
+            nx.from_scipy_sparse_matrix = nx.from_scipy_sparse_array
+            nx.to_scipy_sparse_matrix = nx.to_scipy_sparse_array
+        except AttributeError:
+            # The deprecated method
+            G = nx.from_scipy_sparse_matrix(K)
 
         # ############
         # Graph layout
@@ -2022,6 +2036,12 @@ class DataGraph(object):
         path : str or pathlib.Path or None, optional (default=None)
             Path to save the figure. If None, the figure is save in the same
             folder as the graph, with a standard name
+
+        Returns
+        -------
+        attrib_2_idx : dict
+            Dictionary attributes -> RGB colors. It stores the colors used
+            to represent the attribute value for each node.
         """
 
         # Estimate attribute values automatically
@@ -2093,7 +2113,7 @@ class DataGraph(object):
         plt.savefig(path)
         plt.show(block=False)
 
-        return
+        return attrib_2_idx
 
     # ##########
     # Save graph

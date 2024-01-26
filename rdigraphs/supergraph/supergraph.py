@@ -1917,7 +1917,7 @@ class SuperGraph(object):
         return
 
     def detectCommunities(self, label, alg='louvain', ncmax=None,
-                          comm_label='Comm'):
+                          comm_label='Comm', seed=None):
         """
         Applies the selected community detection algorithm to a given node
 
@@ -1931,13 +1931,15 @@ class SuperGraph(object):
             Number of communities.
         label : str, optional (default='Comm')
             Label for the cluster indices in the output dataframe
+        seed : int or None (default=None)
+            Seed for randomization
         """
 
         if not self.is_active_snode(label):
             self.activate_snode(label)
 
         self.snodes[label].detectCommunities(
-            alg=alg, ncmax=ncmax, label=comm_label)
+            alg=alg, ncmax=ncmax, label=comm_label, seed=seed)
 
         return
 
@@ -1989,8 +1991,6 @@ class SuperGraph(object):
 
         Parameters
         ----------
-        Parameters
-        ----------
         snode_label : str
             Name of the snode
         attribute: str
@@ -2007,21 +2007,22 @@ class SuperGraph(object):
         path : str or None, optional (default=None)
             Path to the file where the graph is saved. If None, a default path
             is used.
-        """
 
-        """
-        Display the graph using matplotlib
-
+        Returns
+        -------
+        attrib_2_idx : dict
+            Dictionary attributes -> RGB colors. It stores the colors used
+            to represent the attribute value for each node.
         """
 
         if not self.is_active_snode(snode_label):
             self.activate_snode(snode_label)
 
-        self.snodes[snode_label].display_graph(
+        att_2_idx = self.snodes[snode_label].display_graph(
             color_att=attribute, node_size=None, edge_width=None,
             show_labels=None, path=path)
 
-        return
+        return att_2_idx
 
     # ##############
     # Snode analysis

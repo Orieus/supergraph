@@ -369,30 +369,33 @@ class SgTaskManager(object):
         self.state['dbReady'] = self.DM.dbON
 
         # Update the project state
-        logging.info(
-            "-- The following databases have been successfully connected:")
-        for corpus in self.DM.SQL:
+        if self.DM.SQL == {} and self.DM.Neo4j is None:
+            logging.info("-- No databases connected")
+        else:
+            logging.info(
+                "-- The following databases have been successfully connected:")
 
-            if self.DM.SQL[corpus].dbON:
-                logging.info(f"-- -- {corpus}")
-                self.db_tables[corpus] = self.DM.SQL[corpus].getTableNames()
-                if self.db_tables[corpus] == []:
-                    logging.info("-- -- DB with no tables in the DB")
-                else:
-                    all_tables = ', '.join(self.db_tables[corpus])
-                    logging.info("      Available tables are: ")
-                    logging.info(f"         {all_tables}")
+            for corpus in self.DM.SQL:
+                if self.DM.SQL[corpus].dbON:
+                    logging.info(f"-- -- {corpus}")
+                    self.db_tables[corpus] = self.DM.SQL[corpus].getTableNames()
+                    if self.db_tables[corpus] == []:
+                        logging.info("-- -- DB with no tables in the DB")
+                    else:
+                        all_tables = ', '.join(self.db_tables[corpus])
+                        logging.info("      Available tables are: ")
+                        logging.info(f"         {all_tables}")
 
-        if self.DM.Neo4j is not None:
-            logging.info("-- -- Neo4j")
-            self.db_tables['neo4j'] = self.DM.Neo4j.get_db_structure()
-            logging.info("      Available components are:")
-            node_list = [x for x, y in self.db_tables['neo4j'].items()
-                         if y['type'] == 'node']
-            edge_list = [x for x, y in self.db_tables['neo4j'].items()
-                         if y['type'] == 'relationship']
-            logging.info(f"         Nodes: {', '.join(node_list)}")
-            logging.info(f"         Edges: {', '.join(edge_list)}")
+            if self.DM.Neo4j is not None:
+                logging.info("-- -- Neo4j")
+                self.db_tables['neo4j'] = self.DM.Neo4j.get_db_structure()
+                logging.info("      Available components are:")
+                node_list = [x for x, y in self.db_tables['neo4j'].items()
+                            if y['type'] == 'node']
+                edge_list = [x for x, y in self.db_tables['neo4j'].items()
+                            if y['type'] == 'relationship']
+                logging.info(f"         Nodes: {', '.join(node_list)}")
+                logging.info(f"         Edges: {', '.join(edge_list)}")
 
         self.state['configReady'] = True
         self.blocksize = self.global_parameters['algorithms']['blocksize']
@@ -2240,7 +2243,8 @@ class SgTaskManager(object):
 
         return
 
-    def detectCommunities(self, algorithm, path, comm_label=None):
+    def detectCommunities(self, algorithm, path, comm_label=None,
+                          seed=None):
         """
         Applies a community detection algorithm to a given snode
 
@@ -2250,6 +2254,10 @@ class SgTaskManager(object):
             Community detection algoritms
         path : str
             Path to snode
+        comm_label : str or None (default=None)
+            Label for the column storing the community indices
+        seed : int or None (default=None)
+            Seed for randomization
         """
 
         if comm_label is None:
@@ -2262,7 +2270,8 @@ class SgTaskManager(object):
         # be done before calling to the snode method. Maybe I should consider
         # activation inside the method
         self.SG.detectCommunities(
-            graph_name, alg=algorithm, ncmax=None, comm_label=comm_label)
+            graph_name, alg=algorithm, ncmax=None, comm_label=comm_label,
+            seed=seed)
 
         # ############
         # SAVE RESULTS
@@ -2408,12 +2417,18 @@ class SgTaskManager(object):
         path: pathlib.Path, str or None, optional (default=None)
             Path to save the figure. If None, the figure is saved in a
             default path.
+
+        Returns
+        -------
+        attrib_2_idx : dict
+            Dictionary attributes -> RGB colors. It stores the colors used
+            to represent the attribute value for each node.
         """
 
         # Create graph obje
         graph_name = path2snode.split(os.path.sep)[-1]
 
-        self.SG.display_graph(graph_name, attribute, path=path)
+        att_2_idx = self.SG.display_graph(graph_name, attribute, path=path)
 
         # ############
         # SAVE RESULTS
@@ -2423,7 +2438,7 @@ class SgTaskManager(object):
         # Reset active snodes or sedges. This is to save memory.
         self._deactivate()
 
-        return
+        return att_2_idx
 
     def display_bigraph(self, path2sedge, s_att1, s_att2, t_att, t_att2=None,
                         template_html="bigraph_template.html",
