@@ -23,19 +23,19 @@ from rdigraphs.sgtaskmanager import SgTaskManager
 # Configurable parameters
 # #######################
 
-# Set tu True if you want to regenerate the graph data
+# Set to True if you want to regenerate the graph data
 reset_graph = True
 
 # Select project:
-n = 40   # 40 or 100
+n = 100   # 40 or 100
 path2project = pathlib.Path('..') / 'projects' / f'OA_AI_{n}topics'
 path2source = pathlib.Path('..') / 'datasets'
-G = 'OA_DC_AI_topics'
+G = f'OA_DC_AI_topics'
 params = {'select_all': True, 'n_topics': f'LDA_{n}'}
 
 # Graph generation
 sim = 'BC'
-n_epn = 20
+n_epn = 100
 # Community detection
 # algorithm = 'louvain'
 algorithm = 'leiden'
