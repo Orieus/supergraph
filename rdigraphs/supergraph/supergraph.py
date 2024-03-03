@@ -2164,9 +2164,21 @@ class SuperGraph(object):
 
         return bgs, total_score
 
-    def node_profile(self):
+    def node_profile(self, node_name):
 
-        report = ""
+        report = {}
+
+        for g in self.get_snodes():
+
+            if node_name in self.snodes[g].nodes:
+
+                # Get the node attributes in self.snodes[g].df_nodes
+                node = self.snodes[g].df_nodes[
+                    self.snodes[g].df_nodes[self.REF] == node_name]
+                
+                # Add the node attributes to a new entry in report as a
+                # dictionary
+                report[g] = node.to_dict()
 
         return report
 
