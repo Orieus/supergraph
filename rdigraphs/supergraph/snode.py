@@ -1125,7 +1125,7 @@ class DataGraph(object):
 
         return
 
-    def filter_nodes_by_threshold(self, att, th, bound='lower'):
+    def filter_nodes_by_threshold(self, att, th, bound='lower', sampleT=True):
         """
         Removes all nodes whose value of a given attribute is below or above a
         given threshold.
@@ -1140,11 +1140,13 @@ class DataGraph(object):
             States if the threshold is a lower (default) or an upper bound.
             If "lower", all nodes with attribute less than the bound are
             removed
+        sampleT : bool, optional (default=True)
+            If True, a sampled T is computed and returned
         """
 
         # Select edges
         nodes = self.get_nodes_by_threshold(att, th, bound=bound)
-        subgraph = self.sub_graph(nodes, sampleT=True)
+        subgraph = self.sub_graph(nodes, sampleT=sampleT)
 
         self.df_nodes = subgraph['nodes']
         self.df_edges = subgraph['edges']
@@ -1159,7 +1161,7 @@ class DataGraph(object):
 
         return
 
-    def filter_nodes_by_value(self, att, value):
+    def filter_nodes_by_value(self, att, value, sampleT=True):
         """
         Removes all nodes whose value of a given attribute is not in a given
         list of allowed values.
@@ -1173,11 +1175,13 @@ class DataGraph(object):
             If None, select columns with null values (pandas nan's).
             If str or int, select collumns taking the given value
             If list, select nodes taking any value in the list
+        sampleT : bool, optional (default=True)
+            If True, a sampled T is computed and returned
         """
 
         # Select edges
         nodes = self.get_nodes_by_value(att, value)
-        subgraph = self.sub_graph(nodes, sampleT=True)
+        subgraph = self.sub_graph(nodes, sampleT=sampleT)
 
         self.df_nodes = subgraph['nodes']
         self.df_edges = subgraph['edges']
@@ -1885,7 +1889,7 @@ class DataGraph(object):
         return q
 
     def graph_layout(self, alg='fa2', color_att=None, gravity=1,
-                     save_gexf=True, display_graph=True):
+                     save_gexf=True, num_iterations=50):
         """
         Compute the layout of the given graph and save the node positions as
         attributes
@@ -1901,8 +1905,8 @@ class DataGraph(object):
             Gravity parameter (only for force atlas 2)
         save_gexf : bool, optional (default=True)
             If True, the graph layout is exported to a gexf file
-        display_graph : bool, optinal (default=True)
-            If True, the graph is plot and saved in a png file
+        num_iterations : int, optional (default=50)
+            Number of iterations for the layout algorithm
         """
 
         # Start clock
@@ -1933,6 +1937,9 @@ class DataGraph(object):
 
         # Compute positions using layout algorithm
         if alg == 'fa2':
+            logging.info("-- -- Creating layout object")
+            logging.warning("-- -- Make sure you are using networkx<2.7. "
+                            "Otherwise, the layout algorithm will fail")
             layout = ForceAtlas2(
                 # Behavior alternatives
                 outboundAttractionDistribution=False,  # Dissuade hubs
@@ -1950,11 +1957,12 @@ class DataGraph(object):
                 gravity=gravity,
                 # Log
                 verbose=True)
+            logging.info("-- -- Iterating layout algorithm")
             positions = layout.forceatlas2_networkx_layout(
-                G, pos=None, iterations=2000)
+                G, pos=None, iterations=num_iterations)
         elif alg == 'fr':
             positions = nx.drawing.layout.spring_layout(
-                G, k=None, pos=None, fixed=None, iterations=50,
+                G, k=None, pos=None, fixed=None, iterations=num_iterations,
                 threshold=0.0001, weight='weight', scale=1, center=None,
                 dim=2, seed=None)
 

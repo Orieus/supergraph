@@ -1371,7 +1371,7 @@ class SuperGraph(object):
     def sub_snode_by_novalue(self, xlabel, att, value, ylabel=None,
                              sampleT=False):
         """
-        Subsample snode by removing all nodes without a given value of the
+        Subsample snode by removing all nodes with a given value of the
         given attribute
 
         Parameters
@@ -1412,7 +1412,7 @@ class SuperGraph(object):
         return
 
     def sub_snode_by_threshold(self, xlabel, att, th, bound='lower',
-                               ylabel=None):
+                               ylabel=None, sampleT=True):
         """
         Subsample snode by the removing all nodes whose value of a given
         attribute is below or above a given threshold
@@ -1445,12 +1445,13 @@ class SuperGraph(object):
             ylabel = xlabel
         else:
             self.duplicate_snode(xlabel, ylabel)
-        self.snodes[ylabel].filter_nodes_by_threshold(att, th, bound=bound)
+        self.snodes[ylabel].filter_nodes_by_threshold(att, th, bound=bound,
+                                                      sampleT=sampleT)
 
         # Log result
         n_nodes = self.snodes[ylabel].n_nodes
         n_edges = self.snodes[ylabel].n_edges
-        aux = {'lower': 'above', 'upper': 'below'}
+        aux = {'lower': 'below', 'upper': 'above'}
         logging.info(f"-- -- Nodes with attribute {att} {aux[bound]} {th} "
                      f"removed. {ylabel} now has {n_nodes} nodes and "
                      f"{n_edges} edges")
@@ -1917,7 +1918,7 @@ class SuperGraph(object):
         return
 
     def detectCommunities(self, label, alg='louvain', ncmax=None,
-                          comm_label='Comm', seed=None):
+                          comm_label=None, seed=None):
         """
         Applies the selected community detection algorithm to a given node
 
@@ -1929,11 +1930,15 @@ class SuperGraph(object):
             Community detection algorithm
         ncmax : int or None, optional (default=None)
             Number of communities.
-        label : str, optional (default='Comm')
-            Label for the cluster indices in the output dataframe
+        comm_label : str, optional (default=None)
+            Label for the community indices in the output dataframe
+            If None, the name of the algorithm is used.
         seed : int or None (default=None)
             Seed for randomization
         """
+
+        if comm_label is None:
+            comm_label = alg
 
         if not self.is_active_snode(label):
             self.activate_snode(label)
@@ -1961,7 +1966,8 @@ class SuperGraph(object):
 
         return
 
-    def graph_layout(self, snode_label, attribute, gravity=1, alg='fa2'):
+    def graph_layout(self, snode_label, attribute, gravity=1, alg='fa2',
+                     num_iterations=50):
         """
         Compute the layout of the given graph
 
@@ -1974,13 +1980,16 @@ class SuperGraph(object):
             2)
         attribute: str
             Snode attribute used to color the graph
+        num_iterations: int, optional (default=50)
+            Number of iterations for the graph layout
         """
 
         if not self.is_active_snode(snode_label):
             self.activate_snode(snode_label)
 
         self.snodes[snode_label].graph_layout(
-            alg=alg, color_att=attribute, gravity=gravity)
+            alg=alg, color_att=attribute, gravity=gravity,
+            num_iterations=num_iterations)
 
         return
 

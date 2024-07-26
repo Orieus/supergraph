@@ -2369,7 +2369,7 @@ class SgTaskManager(object):
     # ###################
     # Graph visualization
     # ###################
-    def graph_layout(self, path2snode, attribute):
+    def graph_layout(self, path2snode, attribute, num_iterations=50):
         """
         Compute the layout of the given graph
 
@@ -2392,7 +2392,8 @@ class SgTaskManager(object):
             alg = 'fr'
             gravity = 1000
 
-        self.SG.graph_layout(graph_name, attribute, gravity=gravity, alg=alg)
+        self.SG.graph_layout(graph_name, attribute, gravity=gravity, alg=alg,
+                             num_iterations=num_iterations)
 
         # ############
         # SAVE RESULTS
