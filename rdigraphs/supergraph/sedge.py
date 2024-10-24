@@ -179,7 +179,7 @@ class SEdge(DataGraph):
 
         # Recompute indices from self.edge_ids
         k_ids = [(s, t - self.n_source) for s, t in self.edge_ids]
-        K = scsp.csr_matrix((self.weights, zip(*k_ids)),
+        K = scsp.csr_matrix((self.weights, tuple(zip(*k_ids))),
                             shape=(self.n_source, self.n_target))
 
         return K

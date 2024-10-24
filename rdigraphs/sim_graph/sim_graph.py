@@ -281,7 +281,7 @@ class SimGraph(ThOps):
         elif n_edges is not None:
             self._compute_sim_graph_from_nedges(n_edges, **kwargs)
         else:
-            logging.error("-- -- At least R or n_edges must be specified")
+            logging.error("-- -- At least s_min or n_edges must be specified")
 
         logging.info(f"-- -- Graph generated with {self.n_nodes} nodes and "
                      f" {len(self.edge_ids)} edges")

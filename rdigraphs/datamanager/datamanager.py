@@ -466,6 +466,44 @@ class DataManager(object):
                        params['n_topics']: 'embeddings'}
             df_table.rename(columns=mapping, inplace=True)
 
+        elif table_name in {'stars', 'starw'}:
+
+            # Remove unrelevant fields
+            # Available fields are: start', 'end', 'tar file', 'source', 'tsne_1', 
+            # 'tsne_2', 'set', 'cluster in z', 'cluster in projected space', 
+            # 'RA', 'DEC', 'CRA', 'CDEC', 'main_type', 'other_types', 'main_id', 
+            # window', 'signal', 'z'
+    
+            if 'select_all' in params and params['select_all']:
+                selected_cols = [
+                    'start', 'end', 'tar file', 'source', 'tsne_1', 'tsne_2',
+                    'set', 'cluster in z', 'cluster in projected space', 
+                    'RA', 'DEC', 'CRA', 'CDEC', 'main_type', 'other_types',
+                    'main_id', '# window', 'signal', 'z']
+            else:
+                selected_cols = [
+                    'set', 'cluster in z', 'cluster in projected space', 
+                    'main_type', 'other_types', 'main_id', '# window',
+                    'signal', 'z']
+
+            df_table = df_table[selected_cols]
+
+            # Create column named as col_id with the index of the dataframe
+            df_table[col_id] = df_table.index
+
+            # Map column names to normalized names
+            mapping = {'z': 'embeddings'}
+            df_table.rename(columns=mapping, inplace=True)
+
+            # Remove duplicates, if any
+            l0 = len(df_table)
+            df_table.drop_duplicates(subset=[col_id], inplace=True)
+            l1 = len(df_table)
+            logging.info(f"-- -- {l0 - l1} duplicated documents removed")
+
+            # Fill nan cells with empty strings
+            df_table.fillna("", inplace=True)
+
         else:
             logging.warning("-- Unknown corpus")
             return None, self.metadata

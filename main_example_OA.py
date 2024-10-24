@@ -93,6 +93,7 @@ if reset_graph or 'cc' not in tm.SG.get_attributes(G):
     tm.SG.detectCommunities(G, alg='cc', ncmax=None, comm_label='cc', seed=43)
 
     # Take the largest connected components
+    breakpoint()
     ncc = 33
     tm.SG.sub_snode_by_threshold(G, 'cc', ncc - 1, bound='upper', sampleT=True)
 

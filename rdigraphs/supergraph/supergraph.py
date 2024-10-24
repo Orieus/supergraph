@@ -776,7 +776,9 @@ class SuperGraph(object):
             Kxy = e01._computeK()
             ksum = Kxy.sum(axis=0) + EPS
             # Normalize rows and aggregate
-            T = np.array(Kxy / ksum).T @ s0.T
+            # (note that s0.T is not the transpose of s0 but attributte T
+            # of the snode s0)
+            T = (Kxy / ksum).T @ s0.T
 
             # Add feature labels, if they exist, to the target node
             T_labels = s0.get_feature_labels()
@@ -1513,10 +1515,10 @@ class SuperGraph(object):
         normalize : bool, optional (default=True)
             If True the graph is normalized so that each node has similarity 1
             to itself.
-        keep_active : bool, optinoal (default=False)
+        keep_active : bool, optional (default=False)
             If True, snodes and sedge are not deactivated before return.
-            If False, X and X-Y are deactivated. Y remains active, otherwise
-            changes would be lost.
+            If False, snodes and sedge are deactivated. To do it, the
+            supergraph is saved, to avoid losing changes.
             If None, the defaul value in self.keep_active is used
 
         Notes
@@ -1619,9 +1621,13 @@ class SuperGraph(object):
                 'transductive')
 
         if not keep_active:
+            # Save the supergraph to avoid losing changes
+            self.save_supergraph()
+
             # Deactivate the snode and sedge that have not changed. Note that
             # ygraph is not deactivated because changes would be lost.
             self.deactivate_snode(xlabel)
+            self.deactivate_snode(ylabel)
             self.deactivate_sedge(xylabel)
 
         return
@@ -1647,8 +1653,8 @@ class SuperGraph(object):
             Path to the ne sedge
         keep_active : bool, optinoal (default=False)
             If True, snodes and sedge are not deactivated before return.
-            If False, XM and MY are deactivated. XY remains active, otherwise
-            changes would be lost.
+            If False, all sedges are deactivated. The supergraph is saved to
+            avoid losing changes.
             If None, the defaul value in self.keep_active is used
         """
 
@@ -1785,10 +1791,14 @@ class SuperGraph(object):
                                        attributes=e_attrib)
 
         if not keep_active:
+            # Save the supergraph to avoid losing changes
+            self.save_supergraph()
+
             # Deactivate the snode and sedge that have not changed. Note that
             # ygraph is not deactivated because changes would be lost.
             self.deactivate_sedge(xmlabel)
-            self.deactivate_snode(mylabel)
+            self.deactivate_sedge(mylabel)
+            self.deactivate_sedge(e_label)
 
         return
 
@@ -1993,8 +2003,9 @@ class SuperGraph(object):
 
         return
 
-    def display_graph(self, snode_label, attribute, node_size=None,
-                      edge_width=None, show_labels=None, path=None):
+    def display_graph(
+            self, snode_label, attribute, size_att=None, base_node_size=None,
+            edge_width=None, show_labels=None, path=None):
         """
         Display the given graph using matplolib
 
@@ -2004,9 +2015,14 @@ class SuperGraph(object):
             Name of the snode
         attribute: str
             Snode attribute used to color the graph
-        node_size : int or None, optional (defautl=None)
-            Size of a degree-1 node in the graph. If None, a value is
-            automatically assigned in proportion to the log number of nodes
+        size_att : str or None, optional (default=None)
+            Name of the attribute in self.df_nodes to use as size index
+            If none, the degree of the nodes is used
+        base_node_size : int or None, optional (defautl=None)
+            Scale factor for the node sizes. The size of each node will be
+            proportional to this argument and to the value of the size_att. 
+            If None, a value is automatically assigned in proportion to the
+            log number of nodes
         edge_width : int or None, optional (defautl=None)
             Edge width. If None, a value is automatically assigned in
             proportion to the log number of nodes
@@ -2028,7 +2044,8 @@ class SuperGraph(object):
             self.activate_snode(snode_label)
 
         att_2_idx = self.snodes[snode_label].display_graph(
-            color_att=attribute, node_size=None, edge_width=None,
+            color_att=attribute, size_att=size_att,
+            base_node_size=base_node_size, edge_width=None,
             show_labels=None, path=path)
 
         return att_2_idx

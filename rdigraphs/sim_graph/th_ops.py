@@ -671,7 +671,15 @@ class ThOps(object):
         Z = X / np.sqrt(normX)
 
         # Compute thresholded product g(Z @ Z.T)
-        return self.th_selfprod(s_min, Z, mode=mode, verbose=verbose)
+        edge_ids, weights = self.th_selfprod(s_min, Z, mode=mode,
+                                             verbose=verbose)
+        
+        # This is to make sure that all values are in the range [-1, 1] (it
+        # may happen that some values are slightly out from the interval
+        # due to numerical errors)
+        weights = [min(1, max(-1, w)) for w in weights]
+
+        return edge_ids, weights
 
     def cosine_sim_bigraph(
             self, X: csr_matrix, Y: csr_matrix, s_min: float,

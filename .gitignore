@@ -129,6 +129,8 @@ dmypy.json
 .pyre/
 
 # Additions JCS
-*.DS_Store 
-temp/
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
 

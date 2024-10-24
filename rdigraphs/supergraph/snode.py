@@ -34,8 +34,9 @@ import seaborn as sns
 try:
     from fa2 import ForceAtlas2   # "pip install fa2"
 except Exception:
-    logging.warning("WARNING: fa2 could not be imported."
-                    "Force-atlas layout not available")
+    logging.warning("WARNING: original fa2 could not be imported."
+                    "Trying with modified version.")
+    from fa2_modified import ForceAtlas2   # "pip install fa2_modified"
 
 # Local imports
 from rdigraphs.sim_graph.sim_graph import SimGraph
@@ -390,7 +391,7 @@ class DataGraph(object):
         """
 
         if len(self.edge_ids) > 0:
-            K = csr_matrix((self.weights, zip(*self.edge_ids)),
+            K = csr_matrix((self.weights, tuple(zip(*self.edge_ids))),
                            shape=(self.n_nodes, self.n_nodes))
         else:
             # If there are no edges, create an empty csr matrix
@@ -435,7 +436,7 @@ class DataGraph(object):
         # Maybe I should use even higher values
         if len(self.edge_ids) > 0:
             dists = [1 - x + EPS for x in self.weights]
-            D = csr_matrix((dists, zip(*self.edge_ids)),
+            D = csr_matrix((dists, tuple(zip(*self.edge_ids))),
                            shape=(self.n_nodes, self.n_nodes))
         else:
             # If there are no edges, create an empty csr matrix
@@ -1122,6 +1123,7 @@ class DataGraph(object):
 
         # Update redundant snode attributes
         self._df_edges_2_atts()
+        self.update_metadata()
 
         return
 
@@ -1334,7 +1336,7 @@ class DataGraph(object):
             'density': 2 * self.n_edges / (self.n_nodes * (self.n_nodes - 1))})
 
         logging.info(f"-- -- Graph generated with {n_gnodes} nodes and "
-                     f"{self.n_edges} edges in {tm} seconds")
+                     f"{self.n_edges} edges in {tm:.4f} seconds")
 
         return
 
@@ -1491,9 +1493,9 @@ class DataGraph(object):
         # Apply the clustering algorithm
         if (not hasattr(self, 'edge_class')
                 or self.edge_class == 'undirected'):
-            G = nx.from_scipy_sparse_matrix(D)
+            G = nx.from_scipy_sparse_array(D)
         else:
-            G = nx.from_scipy_sparse_matrix(D, create_using=nx.DiGraph())
+            G = nx.from_scipy_sparse_array(D, create_using=nx.DiGraph())
 
         # See also pagerank_numpy and pagerank_scipy
         p_max = 0.99
@@ -1655,7 +1657,7 @@ class DataGraph(object):
 
         # End message
         nc = self.metadata['communities'][label]['n_communities']
-        logging.info(f'-- -- {nc} communities computed in {tm} seconds')
+        logging.info(f'-- -- {nc} communities computed in {tm:.4f} seconds')
 
         return
 
@@ -1761,9 +1763,9 @@ class DataGraph(object):
         # Make networkX graph
         if (not hasattr(self, 'edge_class')
                 or self.edge_class == 'undirected'):
-            G = nx.from_scipy_sparse_matrix(W)
+            G = nx.from_scipy_sparse_array(W)
         else:
-            G = nx.from_scipy_sparse_matrix(W, create_using=nx.DiGraph())
+            G = nx.from_scipy_sparse_array(W, create_using=nx.DiGraph())
 
         # ############################################
         # Local graph analysis algorithms
@@ -1840,7 +1842,7 @@ class DataGraph(object):
 
         # End message
         tm = self.metadata['local_features'][label]['time']
-        logging.info(f"-- {parameter} computed in {tm} seconds")
+        logging.info(f"-- {parameter} computed in: {tm:.4f} seconds")
 
         return
 
@@ -1896,9 +1898,9 @@ class DataGraph(object):
 
         Parameters
         ----------
-        alg : str {'fa2', 'fr'}, optional (default=fa2)
+        alg : str {'fa2', 'fr', 'fa2_nx'}, optional (default=fa2)
             Layout algorithm. Ootions are: 'fa2' (forze atlas 2), 'fr'
-            (Fruchterman-Reingold).
+            (Fruchterman-Reingold) and 'fa2_nx' (force atlas 2 from networkx)
         color_att : str or None, optional (default=None)
             Name of the attribute in self.df_nodes to use as color index
         gravity: int, optional (default=1)
@@ -1907,6 +1909,10 @@ class DataGraph(object):
             If True, the graph layout is exported to a gexf file
         num_iterations : int, optional (default=50)
             Number of iterations for the layout algorithm
+
+        Notes
+        -----
+        fa2_nx is too slow for large graphs (tested on nx.3.4).
         """
 
         # Start clock
@@ -1938,8 +1944,6 @@ class DataGraph(object):
         # Compute positions using layout algorithm
         if alg == 'fa2':
             logging.info("-- -- Creating layout object")
-            logging.warning("-- -- Make sure you are using networkx<2.7. "
-                            "Otherwise, the layout algorithm will fail")
             layout = ForceAtlas2(
                 # Behavior alternatives
                 outboundAttractionDistribution=False,  # Dissuade hubs
@@ -1960,6 +1964,20 @@ class DataGraph(object):
             logging.info("-- -- Iterating layout algorithm")
             positions = layout.forceatlas2_networkx_layout(
                 G, pos=None, iterations=num_iterations)
+            
+        elif alg == 'fa2_nx':
+            logging.info("-- -- Creating layout object")
+
+            # This requires networkx >= 3.4
+            positions = nx.forceatlas2_layout(
+                G, pos=None,
+                max_iter=num_iterations, gravity=gravity,
+                # Below, the default values
+                jitter_tolerance=1.0, scaling_ratio=2.0,
+                distributed_action=False, strong_gravity=False,
+                node_mass=None, node_size=None, weight=None,
+                dissuade_hubs=False, linlog=False, seed=None, dim=2)
+
         elif alg == 'fr':
             positions = nx.drawing.layout.spring_layout(
                 G, k=None, pos=None, fixed=None, iterations=num_iterations,
@@ -2019,12 +2037,13 @@ class DataGraph(object):
         self.metadata['graph_layout'] = {'algorithm': alg, 'time': tm}
 
         # End message
-        logging.info(f'-- -- Graph layout computed in {tm} seconds')
+        logging.info(f'-- -- Graph layout computed in {tm:.4f} seconds')
 
         return
 
-    def display_graph(self, color_att=None, node_size=None, edge_width=None,
-                      show_labels=None, path=None):
+    def display_graph(
+            self, color_att=None, size_att=None, base_node_size=None,
+            edge_width=None, show_labels=None, path=None):
         """
         Display the given graph using matplolib
 
@@ -2032,9 +2051,15 @@ class DataGraph(object):
         ----------
         color_att : str or None, optional (default=None)
             Name of the attribute in self.df_nodes to use as color index
-        node_size : int or None, optional (defautl=None)
-            Size of a degree-1 node in the graph. If None, a value is
-            automatically assigned in proportion to the log number of nodes
+            If None, no coloring is used
+        size_att : str or None, optional (default=None)
+            Name of the attribute in self.df_nodes to use as size index
+            If none, the degree of the nodes is used
+        base_node_size : int or None, optional (defautl=None)
+            Scale factor for the node sizes. The size of each node will be
+            proportional to this argument and to the value of the size_att. 
+            If None, a value is automatically assigned in proportion to the
+            log number of nodes
         edge_width : int or None, optional (defautl=None)
             Edge width. If None, a value is automatically assigned in
             proportion to the log number of nodes
@@ -2053,9 +2078,9 @@ class DataGraph(object):
         """
 
         # Estimate attribute values automatically
-        if node_size is None:
+        if base_node_size is None:
             # size of a degree-1 node
-            node_size = 40000 / self.n_nodes**1.5
+            base_node_size = 40000 / self.n_nodes**1.5
         if edge_width is None:
             edge_width = 0.1 + 2 / (1 + np.log10(self.n_edges))
         if show_labels is None:
@@ -2067,7 +2092,7 @@ class DataGraph(object):
         # Compute a sparse affinity matrix from a list of affinity values
         K = self._computeK(diag=False)
         # Convert matrix into graph
-        G = nx.from_scipy_sparse_matrix(K)
+        G = nx.from_scipy_sparse_array(K)
 
         # Read positions
         df_xy = self.df_nodes.loc[:, ['x', 'y']]
@@ -2095,7 +2120,10 @@ class DataGraph(object):
             node_colors = [attrib_2_idx[a] for a in node_attribs]
 
         # Get list of degrees
-        degrees = [node_size * val for (node, val) in G.degree()]
+        if size_att:
+            node_size = [base_node_size * val for val in self.df_nodes[size_att]]
+        else:
+            node_size = [base_node_size * val for (node, val) in G.degree()]
 
         # #############
         # Graph display
@@ -2109,8 +2137,9 @@ class DataGraph(object):
 
         # This is to avoid multiple findfont log messages from matplotlib.
         logging.getLogger('matplotlib.font_manager').disabled = True
+
         plt.figure(figsize=(10, 10))
-        nx.draw(G, positions, node_size=degrees, node_color=node_colors,
+        nx.draw(G, positions, node_size=node_size, node_color=node_colors,
                 width=edge_width, with_labels=show_labels, font_size=24)
 
         # Save to file
