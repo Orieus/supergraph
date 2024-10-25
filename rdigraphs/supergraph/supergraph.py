@@ -119,7 +119,12 @@ class SuperGraph(object):
         for s, t in self.metagraph.edge_ids:
             source = self.metagraph.nodes[s]
             target = self.metagraph.nodes[t]
-            label = source + '_2_' + target
+
+            # Read the name of the sedge from the metagraph
+            label = self.metagraph.df_edges.loc[
+                (self.metagraph.df_edges['Source'] == source) 
+                 & (self.metagraph.df_edges['Target'] == target), 
+                'label'].values[0]
 
             sedge_folder = os.path.join(self.path2sedges, label)
             if not os.path.isdir(sedge_folder):
@@ -500,6 +505,61 @@ class SuperGraph(object):
     # ######################
     # Supergraph information
     # ######################
+
+    def describe(self):
+        """
+        Show summary of the current supergraph structure
+        """
+
+        # Show supergraph structure of snodes and sedges
+        print("\n-- Supergraph structure:")
+        print("-- Graphs:")
+        print(self.metagraph.df_nodes)
+        print("\n-- Bigraphs:")
+        print(self.metagraph.df_edges)
+
+        # Change log level to avoid cumbersome messages at the loggin.INFO
+        # level from some of the methods below
+        logger = logging.getLogger()
+        old_level = logger.level
+        logger.setLevel(logging.ERROR)
+
+        # Show snode attributes
+        print("\n-- Graph attributes:")
+        for label in self.metagraph.nodes:
+            # Create graph object
+            atts = self.get_attributes(label)
+            print(f"-- -- {label}: {', '.join(atts)}")
+
+        # Show graph (snode) dimensions
+        print("\n-- Graph dimensions:")
+        gd = {'Graph': [], 'n_nodes': [], 'n_edges': []}
+        for label in self.metagraph.nodes:
+            metadata = self.get_metadata(label)
+            gd['Graph'].append(label)
+            gd['n_nodes'].append(metadata['nodes']['n_nodes'])
+            gd['n_edges'].append(metadata['edges']['n_edges'])
+        snode_md = pd.DataFrame(gd)
+        print(snode_md)
+
+        # Show bigraph (sedge) dimensions
+        print("\n-- Bigraph dimensions:")
+        gd = {'Bigraph': [], 'n_source': [], 'n_target': [], 'n_edges': []}
+        if 'label' in self.metagraph.df_edges:
+            for label in self.metagraph.df_edges['label']:
+                metadata = self.get_metadata(label, is_node_name=False)
+                gd['Bigraph'].append(label)
+                gd['n_source'].append(metadata['nodes']['n_source'])
+                gd['n_target'].append(metadata['nodes']['n_target'])
+                gd['n_edges'].append(metadata['edges']['n_edges'])
+            sedge_md = pd.DataFrame(gd)
+            print(sedge_md)
+
+        # Restore logging mode
+        logging.getLogger().setLevel(old_level)
+
+        return
+    
     def get_terminals(self, e_label):
         """
         Returns the name of the source and target snodes of a given sedge
@@ -786,6 +846,8 @@ class SuperGraph(object):
 
         # Update metagraph
         s1_attrib = {'category': attrib}
+
+
         self.metagraph.add_single_node(s1.label, attributes=s1_attrib)
         e01_attrib = {'category': 'snode_from_atts',
                       'Type': 'directed',
@@ -2045,8 +2107,8 @@ class SuperGraph(object):
 
         att_2_idx = self.snodes[snode_label].display_graph(
             color_att=attribute, size_att=size_att,
-            base_node_size=base_node_size, edge_width=None,
-            show_labels=None, path=path)
+            base_node_size=base_node_size, edge_width=edge_width,
+            show_labels=show_labels, path=path)
 
         return att_2_idx
 

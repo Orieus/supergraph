@@ -1371,50 +1371,7 @@ class SgTaskManager(object):
         Show current supergraph structure
         """
 
-        # Show supegraph structure of snodes and sedges
-        print("-- Graphs:")
-        print(self.SG.metagraph.df_nodes)
-        print("\n-- Bigraphs:")
-        print(self.SG.metagraph.df_edges)
-
-        # Change log level to avoid cumbersome messages
-        logging.getLogger().setLevel(logging.ERROR)
-
-        # Show snode attributes
-        print("\n-- Graph attributes:")
-        for label in self.SG.metagraph.nodes:
-            # Create graph object
-            atts = self.SG.get_attributes(label)
-            print(f"-- -- {label}: {', '.join(atts)}")
-
-        # Show graph (snode) dimensions
-        print("\n-- Graph dimensions:")
-        gd = {'Graph': [], 'n_nodes': [], 'n_edges': []}
-        for label in self.SG.metagraph.nodes:
-            metadata = self.SG.get_metadata(label)
-            gd['Graph'].append(label)
-            gd['n_nodes'].append(metadata['nodes']['n_nodes'])
-            gd['n_edges'].append(metadata['edges']['n_edges'])
-        snode_md = pd.DataFrame(gd)
-        print(snode_md)
-
-        # Show bigraph (sedge) dimensions
-        print("\n-- Bigraph dimensions:")
-        gd = {'Bigraph': [], 'n_source': [], 'n_target': [],
-              'n_edges': []}
-        if 'label' in self.SG.metagraph.df_edges:
-            for label in self.SG.metagraph.df_edges['label']:
-                metadata = self.SG.get_metadata(label, is_node_name=False)
-                gd['Bigraph'].append(label)
-                gd['n_source'].append(metadata['nodes']['n_source'])
-                gd['n_target'].append(metadata['nodes']['n_target'])
-                gd['n_edges'].append(metadata['edges']['n_edges'])
-            sedge_md = pd.DataFrame(gd)
-            print(sedge_md)
-
-        # Restore logging mode
-        old_level = self.global_parameters['logformat']['cons_level']
-        logging.getLogger().setLevel(old_level)
+        self.SG.describe()
 
         return
 

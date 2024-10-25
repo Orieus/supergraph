@@ -1104,6 +1104,28 @@ class DataGraph(object):
 
         return W
 
+    def describe(self):
+        """
+        Prints a summary of the snode structure
+        """
+
+        md = self.metadata
+
+        print("\n-- Graph attributes:")
+        if 'nodes' in md:
+            print(f"-- -- Number of nodes: {md['nodes']['n_nodes']}")
+        if 'edges' in md:
+            print(f"-- -- Number of edges: {md['edges']['n_edges']}")
+            print(f"-- -- Average neighbors per node: "
+                  f"{md['edges']['neighbors_per_sampled_node']}")
+            print(f"-- -- Density of the graph: "
+                  f"{100 * md['edges']['density']} %")
+            if 'metric' in md['edges']:
+                print(f"-- -- Similarity measure: {md['edges']['metric']}")
+
+        return
+
+
     # ################
     # Graph processing
     # ################
