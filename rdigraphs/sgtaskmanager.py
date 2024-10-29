@@ -318,28 +318,35 @@ class SgTaskManager(object):
         """
 
         # Log to file and console
-
         p = self.global_parameters['logformat']
         fpath = self.path2project / p['filename']
 
+        # Configure logging to file
         logging.basicConfig(
-            filename=fpath, format=p['file_format'],
-            level=p['file_level'], datefmt=p['datefmt'], filemode='w')
+            filename=fpath, format=p['file_format'], level=p['file_level'],
+            datefmt=p['datefmt'], filemode='w')
+
+        # Clear existing handlers to prevent duplicate logs
+        mylogger = logging.getLogger('')
+        if mylogger.hasHandlers():
+            for handler in mylogger.handlers[:]:
+                mylogger.removeHandler(handler)
+                handler.close()
 
         # Define a Handler to write messages to the sys.stderr
         console = logging.StreamHandler()
-        # console.setLevel(p['cons_level'])
-        # Set a format which is simpler for console use
-        # formatter = logging.Formatter(p['cons_format'])
-        # Tell the handler to use this format
-        # console.setFormatter(formatter)
+        # Set level for console
+        console.setLevel(p['cons_level'])
+        
+        # Set the formatter if needed
+        console.setFormatter(logging.Formatter(p['cons_format'], datefmt=p['datefmt']))
+
         # Add the handler to the root logger
-        mylogger = logging.getLogger('')
         mylogger.addHandler(console)
-        mylogger.setLevel(p['cons_level'])
+        mylogger.setLevel(p['file_level'])
 
         return
-
+    
     def setup(self):
         """
         Set up the classification projetc. To do so:
@@ -659,20 +666,7 @@ class SgTaskManager(object):
         Returns a list of the available snodes with saved attributes
         """
 
-        graphs_w_features = []
-        path2snodes = self.path2project / self.f_struct['snodes']
-
-        # Show snode attrtibutes
-        print("\n-- Graph attributes:")
-        for label in self.SG.metagraph.nodes:
-
-            # Create graph object
-            path = path2snodes / label
-            snode = DataGraph(label=label, path=path, load_data=False)
-            if snode.has_saved_features():
-                graphs_w_features.append(label)
-
-        return graphs_w_features
+        return self.SG.get_snodes_with_features()
 
     # ############
     # SQL db views

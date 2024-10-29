@@ -466,7 +466,7 @@ class DataManager(object):
                        params['n_topics']: 'embeddings'}
             df_table.rename(columns=mapping, inplace=True)
 
-        elif table_name in {'stars', 'starw'}:
+        elif table_name.startswith('star'):
 
             # Remove unrelevant fields
             # Available fields are: start', 'end', 'tar file', 'source', 'tsne_1', 

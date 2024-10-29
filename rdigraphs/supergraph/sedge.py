@@ -139,6 +139,33 @@ class SEdge(DataGraph):
 
         return
 
+    def describe(self):
+        """
+        Prints a summary of the sedge structure
+        """
+
+        md = self.metadata
+
+        # Show sedge structure
+        print(f"\n-- Bigraph {self.label} structure:")
+        print(self.df_nodes)
+        print(self.df_edges)
+
+        # Show sedge attributes
+        print("\n-- Bigraph attributes:")
+        atts = self.get_attributes()
+        print(f"-- -- {self.label}: {', '.join(atts)}")
+
+        # Show bigraph (sedge) dimensions
+        print("\n-- Bigraph dimensions:")
+        if 'nodes' in md:
+            print(f"-- -- Number of nodes: {md['nodes']['n_source']}")
+            print(f"-- -- Number of nodes: {md['nodes']['n_target']}")
+        if 'edges' in md:
+            print(f"-- -- Number of edges: {md['edges']['n_edges']}")
+
+        return
+
     def update_metadata(self):
         """
         Updates metadata dictionary with the self variables directly computed

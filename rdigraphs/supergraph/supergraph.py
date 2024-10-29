@@ -10,12 +10,172 @@ import copy
 import os
 import shutil
 import collections
+from tqdm import tqdm
+from scipy.optimize import linear_sum_assignment
 
 # Local Imports
 from rdigraphs.supergraph.snode import DataGraph
 from rdigraphs.supergraph.sedge import SEdge
 
 EPS = np.finfo(float).tiny
+
+
+def lin_sum(Kxy, Kx):
+    """
+    Compute the Ky matrix given sparse Kx and Kxy.
+
+    Parameters:
+    - Kx: scipy.sparse.csr_matrix of shape (n, n), similarity matrix of graph G=(X, Kx).
+    - Kxy: scipy.sparse.csr_matrix of shape (n, m), binary matrix where each column defines a subset of X.
+
+    Returns:
+    - Ky: scipy.sparse.csr_matrix of shape (m, m), where Ky[i, j] is the maximum weight matching similarity
+          between subsets defined by Kxy[:, i] and Kxy[:, j].
+    """
+    n, m = Kxy.shape[0], Kxy.shape[1]
+    Ky_data = []
+    Ky_row = []
+    Ky_col = []
+
+    # Precompute the non-zero indices for each subset
+    subset_indices = []
+    for i in range(m):
+        P_i = Kxy.getcol(i).tocoo().row
+        subset_indices.append(P_i)
+
+    for i in range(m):
+        print(f'Row {i} of {m}    \r', end='')
+        P_i = subset_indices[i]
+        for j in range(i, m):  # Only compute for i <= j
+            P_j = subset_indices[j]
+
+            # Skip if either subset is empty
+            if P_i.size == 0 or P_j.size == 0:
+                logging.info(f'Node {i} or {j} are disconnected')
+                continue
+
+            # Extract the submatrix corresponding to P_i and P_j
+            Kx_sub = Kx[P_i][:, P_j]
+
+            # Check if the submatrix is empty (no non-zero entries)
+            if Kx_sub.nnz == 0:
+                # There are no links between the two subsets.
+                # K[i, j] is zero. No need to compute the similarity.
+                continue
+            else:
+                # Convert the submatrix to dense format if it's small
+                if Kx_sub.shape[0] * Kx_sub.shape[1] <= 10000:
+                    cost_matrix = -Kx_sub.toarray()
+                    # Handle unequal sizes by padding the cost matrix
+                    max_size = max(len(P_i), len(P_j))
+                    padded_cost_matrix = np.full((max_size, max_size), fill_value=0.0)
+                    padded_cost_matrix[:len(P_i), :len(P_j)] = cost_matrix
+
+                    # Apply the Hungarian algorithm
+                    row_ind, col_ind = linear_sum_assignment(padded_cost_matrix)
+
+                    # Compute the total similarity (negate the cost back)
+                    total_similarity = (
+                        -padded_cost_matrix[row_ind, col_ind].sum() 
+                        / (max_size + EPS))
+
+                    # Store the result for both Ky[i, j] and Ky[j, i]
+                    Ky_data.append(total_similarity)
+                    Ky_row.append(i)
+                    Ky_col.append(j)
+
+                    if i != j:
+                        # Store the result for Ky[j, i], too
+                        Ky_data.append(total_similarity)
+                        Ky_row.append(j)
+                        Ky_col.append(i)
+                else:
+                    # For larger submatrices, consider alternative methods
+                    # For now, we can skip or approximate
+                    logging.warning(
+                        f"Skipping large submatrix ({i}, {j}) with shape "
+                        f"{Kx_sub.shape}")
+                    logging.warning(
+                        f"We assign 0 similarity for these cases, unless for "
+                        "the diagonal elements, which are set to 1.")
+                    if i==j:
+                        Ky_data.append(1)
+                        Ky_row.append(i)
+                        Ky_col.append(j)
+                    pass  # Skipping large submatrices for efficiency
+
+    # Create the sparse Ky matrix
+    Ky = scsp.csr_matrix((Ky_data, (Ky_row, Ky_col)), shape=(m, m))
+
+    return Ky
+
+
+def max_max(Kxy, Kx):
+    """
+    given a binary matrix Kxy and a square matrix Kx, computes matrix Ky
+    where Ky[i, j] = max_{l, m} Kxy[l,i] Kx[l,m]·Kxy[m,j]
+
+    Parameters
+    ----------
+    Kxy : scipy.sparse.csr_matrix of shape (nx, ny)
+        Input (non-square)
+    Kx : scipy.sparse.csr_matrix of shape (nx, nx)
+        Square matrix
+
+    Returns:
+    --------
+    Ky: csr_matrix of shape (ny, ny)
+    """
+
+    ny = Kxy.shape[1]
+    Ky_data = {}  # Dictionary to store the maximum value for each (i, j)
+    Kx_coo = Kx.tocoo()
+
+    # Iterate over non-zero elements of Kx
+    for m, n, val_kx in zip(Kx_coo.row, Kx_coo.col, Kx_coo.data):
+        # Print progres by showing the row number
+        print(f'Row {m} of {Kx.shape[0]}    \r', end='')
+
+        # Get non-zero elements of row m in Kxy
+        row_m = Kxy.getrow(m)
+        indices_i = row_m.indices
+        data_i = row_m.data
+
+        # Get non-zero elements of row n in Kxy
+        row_n = Kxy.getrow(n)
+        indices_j = row_n.indices
+        data_j = row_n.data
+
+        # Compute the outer product of non-zero elements
+        for idx_i, i in enumerate(indices_i):
+            ri =  data_i[idx_i] * val_kx
+            for idx_j, j in enumerate(indices_j):
+                if i <= j:
+                    val = ri * data_j[idx_j]
+                    key = (i, j)
+                    # Update the maximum value for each (i, j)
+                    if key not in Ky_data or val > Ky_data[key]:
+                        Ky_data[key] = val
+
+    # Prepare data for constructing the sparse Ky
+    row_indices = []
+    col_indices = []
+    data_values = []
+    for (i, j), val in Ky_data.items():
+        row_indices.append(i)
+        col_indices.append(j)
+        data_values.append(val)
+        if i != j:
+            # Add the symmetric element
+            row_indices.append(j)
+            col_indices.append(i)
+            data_values.append(val)
+
+    # Create Ky as a sparse CSR matrix
+    Ky = scsp.csr_matrix((data_values, (row_indices, col_indices)),
+                         shape=(ny, ny))
+
+    return Ky
 
 
 class SuperGraph(object):
@@ -401,7 +561,8 @@ class SuperGraph(object):
 
     def activate_snode(self, label):
         """
-        Loads snode into the dictionary of active snodes
+        Loads snode into the dictionary of active snodes.
+        If the snode is already active, it is not loaded again.
 
         Parameters
         ----------
@@ -409,6 +570,11 @@ class SuperGraph(object):
             Name of the snode
         """
 
+        # If the node is already active, it is not loaded again (to avoid
+        # losing non-saved data in the active node)
+        if self.is_active_snode(label):
+            return
+        
         # Check if sedge named e_label do exists
         if self.is_snode(label):
             path = os.path.join(self.path2snodes, label)
@@ -423,6 +589,7 @@ class SuperGraph(object):
     def activate_sedge(self, label):
         """
         Loads sedge into the dictionary of active sedges.
+        If the sedge is already active, it is not loaded again.
 
         Parameters
         ----------
@@ -430,6 +597,11 @@ class SuperGraph(object):
             Name of the sedge
         """
 
+        # If the edge is already active, it is not loaded again (to avoid
+        # losing non-saved data in the active edge)
+        if self.is_active_sedge(label):
+            return
+        
         if self.is_sedge(label):
             path = os.path.join(self.path2sedges, label)
             self.sedges[label] = SEdge(label=label, path=path)
@@ -446,13 +618,11 @@ class SuperGraph(object):
         """
 
         for node in self.metagraph.nodes:
-            if not self.is_active_snode(node):
-                self.activate_snode(node)
+            self.activate_snode(node)
 
         if 'label' in self.metagraph.df_edges:
             for edge in self.metagraph.df_edges['label'].tolist():
-                if not self.is_active_sedge(edge):
-                    self.activate_sedge(edge)
+                self.activate_sedge(edge)
 
         return
 
@@ -506,57 +676,91 @@ class SuperGraph(object):
     # Supergraph information
     # ######################
 
-    def describe(self):
+    def describe(self, label=None):
         """
         Show summary of the current supergraph structure
+
+        Parameters
+        ----------
+        label : str or None, optional (default=None)
+            If None, the summary of the whole supergraph is shown.
+            Otherwise, the summary of the snode or sedge given by label is
+            shown.
         """
 
-        # Show supergraph structure of snodes and sedges
-        print("\n-- Supergraph structure:")
-        print("-- Graphs:")
-        print(self.metagraph.df_nodes)
-        print("\n-- Bigraphs:")
-        print(self.metagraph.df_edges)
+        if label is None:
+            # Show supergraph structure of snodes and sedges
+            print("\n-- Supergraph structure:")
+            print("-- Graphs:")
+            print(self.metagraph.df_nodes)
+            print("\n-- Bigraphs:")
+            print(self.metagraph.df_edges)
 
-        # Change log level to avoid cumbersome messages at the loggin.INFO
-        # level from some of the methods below
-        logger = logging.getLogger()
-        old_level = logger.level
-        logger.setLevel(logging.ERROR)
+            # Change log level to avoid cumbersome messages at the loggin.INFO
+            # level from some of the methods below
+            logger = logging.getLogger()
+            old_level = logger.level
+            logger.setLevel(logging.ERROR)
 
-        # Show snode attributes
-        print("\n-- Graph attributes:")
-        for label in self.metagraph.nodes:
-            # Create graph object
-            atts = self.get_attributes(label)
-            print(f"-- -- {label}: {', '.join(atts)}")
+            # Show snode attributes
+            print("\n-- Graph attributes:")
+            for label in self.metagraph.nodes:
+                # Create graph object
+                atts = self.get_attributes(label)
+                print(f"-- -- {label}: {', '.join(atts)}")
 
-        # Show graph (snode) dimensions
-        print("\n-- Graph dimensions:")
-        gd = {'Graph': [], 'n_nodes': [], 'n_edges': []}
-        for label in self.metagraph.nodes:
-            metadata = self.get_metadata(label)
-            gd['Graph'].append(label)
-            gd['n_nodes'].append(metadata['nodes']['n_nodes'])
-            gd['n_edges'].append(metadata['edges']['n_edges'])
-        snode_md = pd.DataFrame(gd)
-        print(snode_md)
-
-        # Show bigraph (sedge) dimensions
-        print("\n-- Bigraph dimensions:")
-        gd = {'Bigraph': [], 'n_source': [], 'n_target': [], 'n_edges': []}
-        if 'label' in self.metagraph.df_edges:
-            for label in self.metagraph.df_edges['label']:
-                metadata = self.get_metadata(label, is_node_name=False)
-                gd['Bigraph'].append(label)
-                gd['n_source'].append(metadata['nodes']['n_source'])
-                gd['n_target'].append(metadata['nodes']['n_target'])
+            # Show graph (snode) dimensions
+            print("\n-- Graph dimensions:")
+            gd = {'Graph': [], 'n_nodes': [], 'n_edges': []}
+            for label in self.metagraph.nodes:
+                metadata = self.get_metadata(label)
+                gd['Graph'].append(label)
+                gd['n_nodes'].append(metadata['nodes']['n_nodes'])
                 gd['n_edges'].append(metadata['edges']['n_edges'])
-            sedge_md = pd.DataFrame(gd)
-            print(sedge_md)
+            snode_md = pd.DataFrame(gd)
+            print(snode_md)
 
-        # Restore logging mode
-        logging.getLogger().setLevel(old_level)
+            # Show bigraph (sedge) dimensions
+            print("\n-- Bigraph dimensions:")
+            gd = {'Bigraph': [], 'n_source': [], 'n_target': [], 'n_edges': []}
+            if 'label' in self.metagraph.df_edges:
+                for label in self.metagraph.df_edges['label']:
+                    metadata = self.get_metadata(label, is_node_name=False)
+                    gd['Bigraph'].append(label)
+                    gd['n_source'].append(metadata['nodes']['n_source'])
+                    gd['n_target'].append(metadata['nodes']['n_target'])
+                    gd['n_edges'].append(metadata['edges']['n_edges'])
+                sedge_md = pd.DataFrame(gd)
+                print(sedge_md)
+
+            # Restore logging mode
+            logging.getLogger().setLevel(old_level)
+
+        else:
+            # We use the describe method of the snode or sedge to show the
+            # summary of the given component
+
+            if self.is_snode(label):
+                if self.is_active_snode(label):
+                    self.snodes[label].describe()
+                else:
+                    # If the snode is not in memory, we read the snode from
+                    # file without loading the whole data. Only the metadata
+                    # is actually needed.
+                    path = os.path.join(self.path2snodes, label)
+                    snode = DataGraph(label=label, path=path, load_data=False)
+                    snode.describe()   
+
+            elif self.is_sedge(label):    
+                if self.is_active_sedge(label):
+                    self.sedges[label].describe()
+                else:
+                    # Read sedge metadata if not in memory
+                    path = os.path.join(self.path2sedges, label)
+                    sedge = SEdge(label=label, path=path, load_data=False)
+                    sedge.describe()
+            else:
+                logging.error(f"-- -- {label} does not exist in the supergraph")
 
         return
     
@@ -701,6 +905,26 @@ class SuperGraph(object):
         else:
             return []
 
+    def get_snodes_with_features(self):
+        """
+        Returns a list of the available snodes with saved attributes
+        """
+
+        snodes_w_features = []
+
+        # Show snode attrtibutes
+        print("\n-- Snode attributes:")
+        for label in self.metagraph.nodes:
+
+            # Create graph object
+            path = self.path2snodes / label
+            snode = DataGraph(label=label, path=path, load_data=False)
+            if snode.has_saved_features():
+                snodes_w_features.append(label)
+
+        return snodes_w_features
+
+
     # ###############
     # Snode inference
     # ###############
@@ -741,8 +965,13 @@ class SuperGraph(object):
             the feature vectors from the source node that are linked to it.
         """
 
-        if not self.is_active_snode(source):
-            self.activate_snode(source)
+        self.activate_snode(source)
+
+        # Defaults name of the target snode and the sedge
+        if target is None:
+            target = attrib
+        if e_label is None:
+            e_label = f"{source}_2_{target}"
 
         # #############
         # Default paths
@@ -750,12 +979,6 @@ class SuperGraph(object):
             path_snode = os.path.join(self.path2snodes, target)
         if path_sedge is None:
             path_sedge = os.path.join(self.path2sedges, e_label)
-
-        # Default name of the target snode and the sedge
-        if target is None:
-            target = attrib
-        if e_label is None:
-            e_label = f"{source}_2_{target}"
 
         # ############
         # Source snode
@@ -847,7 +1070,6 @@ class SuperGraph(object):
         # Update metagraph
         s1_attrib = {'category': attrib}
 
-
         self.metagraph.add_single_node(s1.label, attributes=s1_attrib)
         e01_attrib = {'category': 'snode_from_atts',
                       'Type': 'directed',
@@ -890,8 +1112,7 @@ class SuperGraph(object):
             a default name {source}_2_{target} is used
         """
 
-        if not self.is_active_snode(source):
-            self.activate_snode(source)
+        self.activate_snode(source)
 
         # #############
         # Default paths
@@ -1004,8 +1225,7 @@ class SuperGraph(object):
             a default name {source}_2_{target} is used
         """
 
-        if not self.is_active_snode(source):
-            self.activate_snode(source)
+        self.activate_snode(source)
 
         # #############
         # Default paths
@@ -1147,8 +1367,7 @@ class SuperGraph(object):
             messaging is omitted
         """
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
+        self.activate_snode(label)
 
         self.snodes[label].computeSimGraph(
             s_min=s_min, n_gnodes=n_gnodes, n_edges=n_edges,
@@ -1222,10 +1441,8 @@ class SuperGraph(object):
             If False, block-by-block messaging is omitted
         """
 
-        if not self.is_active_snode(s_label):
-            self.activate_snode(s_label)
-        if not self.is_active_snode(t_label):
-            self.activate_snode(t_label)
+        self.activate_snode(s_label)
+        self.activate_snode(t_label)
 
         # ################
         # Create superedge
@@ -1276,8 +1493,7 @@ class SuperGraph(object):
             If true, the new graph overrides the original graph
         """
 
-        if not self.is_active_snode(s_label):
-            self.activate_snode(s_label)
+        self.activate_snode(s_label)
 
         edges, weights = self.snodes[s_label].compute_ppr(th=th)
 
@@ -1337,8 +1553,7 @@ class SuperGraph(object):
                 "inconsistent.")
             sampleT = True
 
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
+        self.activate_snode(xlabel)
 
         # If no ylabel is given, the subsampled snode replaces the original
         if ylabel is None:
@@ -1413,8 +1628,7 @@ class SuperGraph(object):
         Note that the feature matrix, if it exists, is not sampled.
         """
 
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
+        self.activate_snode(xlabel)
 
         # If no ylabel is given, the subsampled snode replaces the original
         if ylabel is None:
@@ -1454,8 +1668,7 @@ class SuperGraph(object):
             If True, the feature matrix is also sampled, if it exists.
         """
 
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
+        self.activate_snode(xlabel)
 
         # If no ylabel is given, the subsampled snode replaces the original
         if ylabel is None:
@@ -1501,8 +1714,7 @@ class SuperGraph(object):
             If True, the feature matrix is also sampled, if it exists.
         """
 
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
+        self.activate_snode(xlabel)
 
         # If no ylabel is given, the subsampled snode replaces the original
         if ylabel is None:
@@ -1533,9 +1745,7 @@ class SuperGraph(object):
             Threshold
         """
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.snodes[label].filter_edges(th)
 
         return
@@ -1552,40 +1762,52 @@ class SuperGraph(object):
             Threshold
         """
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.sedges[label].filter_edges(th)
 
         return
 
-    def transduce(self, xylabel, n=1, normalize=True, keep_active=None):
+    def transduce(self, xylabel, n=1, normalize=True, keep_active=None,
+                  method='sum_sum'):
         """
         Given snode X and sedge X-Y, compute a graph for Y based on the
-        connectivity betwen nodes in Y through edges from Y to X (strored
+        connectivity between nodes in Y through edges from Y to X (stored
         in X-Y) and edges in X.
 
         Parameters
         ----------
         xylabel : str
-            Name of the sedge (bipartite graph) X-Y.
-            The names of snodes X and Y will be taken from the metadata of the
-            bipartite graph
+            Name of the sedge (bipartite graph) X-Y. The names of snodes X and
+            Y will be taken from the metadata of the bipartite graph
         n : int, optional (default=1)
-            Order for K. A positive integer.
-            The affinity matrix is a normalized version of F·K^n·F'
+            Order forthe affinity matrix of X. A positive integer.
+            The affinity matrix of Y is computed as a function of the paths
+            connecting nodes in Y through (n + 1) nodes in X.
         normalize : bool, optional (default=True)
-            If True the graph is normalized so that each node has similarity 1
-            to itself.
+            If True, graph is normalized so that nodes have self-similarity 1
         keep_active : bool, optional (default=False)
             If True, snodes and sedge are not deactivated before return.
             If False, snodes and sedge are deactivated. To do it, the
             supergraph is saved, to avoid losing changes.
-            If None, the defaul value in self.keep_active is used
+            If None, the default value in self.keep_active is used
+        method : str {'sum_sum', 'max_max'}, optional (default='sum_sum')
+            Method to compute the affinity matrix.
+            If 'sum_sum': the paths connecting nodes in Y throuh n nodes in X
+            are aggregated by summing the path affinities.
+            If 'max_max': the paths connecting nodes in Y throuh n nodes in X
+            are aggregated by taking the maximum path affinity.
 
         Notes
         -----
-        The new graph is stored in the edges of snode Y.
+        The new graph is stored in snode Y.
+        
+        If Kxy is the affinity matrix between nodes in X and Y, Kx is the
+        affinity matrix of X, and Ky is the affinity matrix of Y, the affinity
+        matrix of Y is computed as follows:
+
+        For method=sum_sum:   Ky = Kxy.T·Kx^n·Kxy
+        For method=max_max:   Ky[i,j] = max_{l, m} Kxy[l,i] Kx^n[l,m]·Kxy[m,j]
+        For method=sum_max:   Ky[i,j] = sum_l max_m Kxy[l,i] Kx^n[l,m]·Kxy[m,j]
         """
 
         logging.info("-- Computing transductive graph")
@@ -1594,25 +1816,19 @@ class SuperGraph(object):
             keep_active = self.keep_active
 
         # Make sure that both terminal snodes and the sedge are active
-        if not self.is_active_sedge(xylabel):
-            self.activate_sedge(xylabel)
+        self.activate_sedge(xylabel)
         xlabel = self.sedges[xylabel].metadata['graph']['source']
         ylabel = self.sedges[xylabel].metadata['graph']['target']
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
-        if not self.is_active_snode(ylabel):
-            self.activate_snode(ylabel)
+        self.activate_snode(xlabel)
+        self.activate_snode(ylabel)
 
         # Get superedge
         xygraph = self.sedges[xylabel]
-
         # Get source and target snodes
         xlabel = xygraph.metadata['graph']['source']
         ylabel = xygraph.metadata['graph']['target']
-
         xgraph = self.snodes[xlabel]
         ygraph = self.snodes[ylabel]
-
         if ygraph.n_edges > 0:
             logging.warning(f"-- -- snode {ylabel} contains {ygraph.n_edges}"
                             " edges. They will be removed")
@@ -1621,30 +1837,38 @@ class SuperGraph(object):
         if n == 0:
             Kx = scsp.identity(xgraph.n_nodes, format='dia')
         elif n == 1:
-            # The code for n>1 can be used for n=1 too, but the code below
-            # avoids duplicating the affinity matrix.
+            # The code for n>1 can be used for n=1 too, but a specific code for
+            # n=1 avoids duplicating the affinity matrix.
             Kx = xgraph._computeK()
         else:
             K0 = xgraph._computeK()
             Kx = copy.deepcopy(K0)
             for i in range(n - 1):
-                Kx = Kx.dot(K0)
+                Kx = Kx @ K0
 
         # Compute affinity matrix for the xygraph
         Kxy = xygraph._computeK()
 
         if Kxy.shape[0] != Kx.shape[0]:
-            logging.error(
-                "The feature vectors and the similarity matrix have "
-                "mismatching dimensions.")
+            logging.error("The feature vectors and the similarity matrix have "
+                          "mismatching dimensions.")
 
-        S = Kxy.transpose().dot(Kx.dot(Kxy))
+        # Compute the affinity matrix for the new graph
+        if method == 'sum_sum':
+            S = Kxy.T @ Kx @ Kxy
+        elif method == 'max_max':
+            S = max_max(Kxy, Kx)
+        elif method == 'lin_sum':
+            S = lin_sum(Kxy, Kx)
+        else:
+            logging.error(f"Method {method} not recognized.")
+            return
 
         # Normalization. This is done to make sure that the similarity of
         # a node with itself is 1.
         if normalize:
             R = scsp.diags(1.0 / np.sqrt(scsp.csr_matrix.diagonal(S)))
-            S = R.dot(S.dot(R))
+            S = R @ S @ R
 
         # Compute lists with origin, destination and value for all edges in the
         # graph affinity matric.
@@ -1669,8 +1893,7 @@ class SuperGraph(object):
 
         # Update metadata
         ygraph.metadata['graph'].update({'subcategory': 'transductive',
-                                         'order': n,
-                                         'normalize': normalize})
+                                         'order': n, 'normalize': normalize})
         ygraph.update_metadata()
 
         logging.info(f"-- -- Transductive graph generated with "
@@ -1685,9 +1908,7 @@ class SuperGraph(object):
         if not keep_active:
             # Save the supergraph to avoid losing changes
             self.save_supergraph()
-
-            # Deactivate the snode and sedge that have not changed. Note that
-            # ygraph is not deactivated because changes would be lost.
+            # Deactivate the snodes and the sedge.
             self.deactivate_snode(xlabel)
             self.deactivate_snode(ylabel)
             self.deactivate_sedge(xylabel)
@@ -1723,10 +1944,8 @@ class SuperGraph(object):
         if keep_active is None:
             keep_active = self.keep_active
 
-        if not self.is_active_sedge(xmlabel):
-            self.activate_sedge(xmlabel)
-        if not self.is_active_sedge(mylabel):
-            self.activate_sedge(mylabel)
+        self.activate_sedge(xmlabel)
+        self.activate_sedge(mylabel)
 
         # ################################
         # Check if sedges must be reversed
@@ -1940,9 +2159,7 @@ class SuperGraph(object):
         att_values : dataframe containing the attribute values
         """
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.snodes[label].add_attributes(att, att_values)
 
         return
@@ -1965,9 +2182,7 @@ class SuperGraph(object):
             the value of a flat feature vector (i.e. 1/nf) to be selected.
         """
 
-        if not self.is_active_snode(graph_name):
-            self.activate_snode(graph_name)
-
+        self.activate_snode(graph_name)
         self.snodes[graph_name].label_nodes_from_features(att=att, thp=thp)
 
         return
@@ -1982,9 +2197,7 @@ class SuperGraph(object):
             Name or names of the attributes to remove
         """
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.snodes[label].remove_attributes(att_names)
 
         return
@@ -2012,9 +2225,7 @@ class SuperGraph(object):
         if comm_label is None:
             comm_label = alg
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.snodes[label].detectCommunities(
             alg=alg, ncmax=ncmax, label=comm_label, seed=seed)
 
@@ -2031,9 +2242,7 @@ class SuperGraph(object):
         """
 
         # Activate snode
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.snodes[label].remove_isolated()
 
         return
@@ -2056,9 +2265,7 @@ class SuperGraph(object):
             Number of iterations for the graph layout
         """
 
-        if not self.is_active_snode(snode_label):
-            self.activate_snode(snode_label)
-
+        self.activate_snode(snode_label)
         self.snodes[snode_label].graph_layout(
             alg=alg, color_att=attribute, gravity=gravity,
             num_iterations=num_iterations)
@@ -2102,9 +2309,7 @@ class SuperGraph(object):
             to represent the attribute value for each node.
         """
 
-        if not self.is_active_snode(snode_label):
-            self.activate_snode(snode_label)
-
+        self.activate_snode(snode_label)
         att_2_idx = self.snodes[snode_label].display_graph(
             color_att=attribute, size_att=size_att,
             base_node_size=base_node_size, edge_width=edge_width,
@@ -2137,10 +2342,8 @@ class SuperGraph(object):
             Value of the cosine similarity
         """
 
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
-        if not self.is_active_snode(ylabel):
-            self.activate_snode(ylabel)
+        self.activate_snode(xlabel)
+        self.activate_snode(ylabel)
 
         # Check if X and Y have identical lists of nodes
         xnodes = self.snodes[xlabel].nodes
@@ -2176,9 +2379,7 @@ class SuperGraph(object):
             Name of the local feature
         """
 
-        if not self.is_active_snode(label):
-            self.activate_snode(label)
-
+        self.activate_snode(label)
         self.snodes[label].local_graph_analysis(
             parameter=parameter, label=parameter)
 
@@ -2309,9 +2510,7 @@ class SuperGraph(object):
             Path to the output file of edges
         """
 
-        if not self.is_active_snode(snode_label):
-            self.activate_snode(snode_label)
-
+        self.activate_snode(snode_label)
         self.snodes[snode_label].export_2_parquet(path2nodes, path2edges)
 
         return
@@ -2348,12 +2547,9 @@ class SuperGraph(object):
         s_label, t_label = self.get_terminals(e_label)
 
         # Activate sedge and snodes
-        if not self.is_active_sedge(e_label):
-            self.activate_sedge(e_label)
-        if not self.is_active_snode(s_label):
-            self.activate_snode(s_label)
-        if not self.is_active_snode(t_label):
-            self.activate_snode(t_label)
+        self.activate_sedge(e_label)
+        self.activate_snode(s_label)
+        self.activate_snode(t_label)
 
         # #####################################
         # MAKE BIGRAPH DATAFRAME IN HALO FORMAT
@@ -2510,5 +2706,3 @@ class SuperGraph(object):
     #         # Remove auxiliary column
     #         gXY.df_nodes.drop('freq314159', axis=1, inplace=True)
     #         gXY.nodes = gXY.df_nodes[gXY.REF].tolist()
-
-

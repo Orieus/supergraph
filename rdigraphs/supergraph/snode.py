@@ -32,11 +32,11 @@ import seaborn as sns
 # To allow using the rest of the code for python>3.8, we catch the error
 # to keep running.
 try:
-    from fa2 import ForceAtlas2   # "pip install fa2"
-except Exception:
-    logging.warning("WARNING: original fa2 could not be imported."
-                    "Trying with modified version.")
     from fa2_modified import ForceAtlas2   # "pip install fa2_modified"
+except Exception:
+    from fa2 import ForceAtlas2   # "pip install fa2"
+    logging.warning("WARNING: fa2_modufied could not be imported."
+                    "Trying with fa2 version (requires python<3.8)")
 
 # Local imports
 from rdigraphs.sim_graph.sim_graph import SimGraph
@@ -190,7 +190,8 @@ class DataGraph(object):
             else:
                 self.n_nodes = self.metadata['nodes']['n_nodes']
                 self.n_edges = self.metadata['edges']['n_edges']
-                logging.info(f'-- -- Metadata from graph {self.label} loaded.')
+                # logging.info(
+                #     f'-- -- Metadata from graph {self.label} loaded.')
 
         return
 
@@ -375,7 +376,7 @@ class DataGraph(object):
         Given the list of affinity values in self.weights, computes a sparse
         symmetric affinity matrix.
 
-        This method has bee translated to CommunityPlus class. It is not being
+        This method has been translated to CommunityPlus class. It is not being
         used by snode at the time of writing this comment, but we keep it here
         just in case...
 
@@ -570,7 +571,10 @@ class DataGraph(object):
                 # The input node is the first node in the graph
                 self.df_edges = pd.DataFrame([row])
             else:
-                self.df_edges = self.df_edges.append(row, ignore_index=True)
+                # Add row to the dataframe of nodes
+                new_row = pd.DataFrame(row, index=[0])
+                self.df_edges = pd.concat(
+                    [self.df_edges, new_row]).reset_index(drop=True)
 
             self._df_edges_2_atts()
 
@@ -1111,20 +1115,34 @@ class DataGraph(object):
 
         md = self.metadata
 
-        print("\n-- Graph attributes:")
+        # Show snode structure
+        print(f"\n-- Graph name: {self.label}")
+        print(f"\n-- -- Nodes:")
+        print(self.df_nodes)
+        print(f"\n-- -- Edges:")
+        print(self.df_edges)
+
+        # Show snode attributes
+        print("\n-- -- Attributes:")
+        atts = self.get_attributes()
+        print(f"-- -- -- {', '.join(atts)}")
+
+        # Show graph (snode) dimensions
+        print("\n-- -- Dimensions:")
         if 'nodes' in md:
-            print(f"-- -- Number of nodes: {md['nodes']['n_nodes']}")
+            print(f"-- -- -- Number of nodes: {md['nodes']['n_nodes']}")
         if 'edges' in md:
-            print(f"-- -- Number of edges: {md['edges']['n_edges']}")
-            print(f"-- -- Average neighbors per node: "
-                  f"{md['edges']['neighbors_per_sampled_node']}")
-            print(f"-- -- Density of the graph: "
-                  f"{100 * md['edges']['density']} %")
+            print(f"-- -- -- Number of edges: {md['edges']['n_edges']}")
+            if "neighbors_per_sampled_node" in md['edges']:
+                print(f"-- -- -- Average neighbors per node: "
+                    f"{md['edges']['neighbors_per_sampled_node']}")
+            if "density" in md['edges']:
+                print(f"-- -- -- Density of the graph: "
+                    f"{100 * md['edges']['density']} %")
             if 'metric' in md['edges']:
-                print(f"-- -- Similarity measure: {md['edges']['metric']}")
+                print(f"-- -- -- Similarity measure: {md['edges']['metric']}")
 
         return
-
 
     # ################
     # Graph processing
