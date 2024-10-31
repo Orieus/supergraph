@@ -78,8 +78,6 @@ class SEdge(DataGraph):
         """
 
         # Class attributes (besides those of the parent class)
-        # These attributes are redundant, because they can be found in
-        # self.metadata. I can consider removing them in the future.
         self.n_source = None
         self.n_target = None
         self.label_source = label_source
@@ -284,7 +282,7 @@ class SEdge(DataGraph):
         return [x for x in self.df_nodes[self.REF] if x[0] == 't']
 
     def set_nodes(self, nodes_orig=[], nodes_dest=[], Xs=None, Xt=None,
-                  save_T=False):
+                  save_T=False, add_prefix=True):
         """
         Loads a superedge with a given set of source and target nodes.
 
@@ -304,23 +302,16 @@ class SEdge(DataGraph):
             feature
         save_T : bool, optional (default=False)
             If True, features matrices are saver into npz files.
+        add_prefix : bool, optional (default=True)
+            If True, source and target nodes are prefixed with 's_' and 't_',
+            respectively. This is useful to avoid name collisions between
+            source and target nodes
         """
 
         # Remove duplicate names between source and target nodes:
-        # if len(set(nodes_orig).intersection(set(nodes_dest))) > 0:
-        #     logging.warning(
-        #         '---- Source and target nodes have common names.\n' +
-        #         '     Prefixes s_ and t_ will be used to discriminate ' +
-        #         'types of nodes')
-
-        #     nodes_orig = ['s_' + str(x) for x in nodes_orig]
-        #     nodes_dest = ['t_' + str(x) for x in nodes_dest]
-        #     prefix_names = True
-        # else:
-        #     prefix_names = False
-        nodes_orig = ['s_' + str(x) for x in nodes_orig]
-        nodes_dest = ['t_' + str(x) for x in nodes_dest]
-        prefix_names = True
+        if add_prefix:
+            nodes_orig = ['s_' + str(x) for x in nodes_orig]
+            nodes_dest = ['t_' + str(x) for x in nodes_dest]
 
         # Default lists of nodes
         if len(nodes_orig) == 0:
@@ -357,7 +348,7 @@ class SEdge(DataGraph):
                               + "equal to the number of rows in Xt")
 
         # Update metadata dictionary
-        self.metadata['graph'].update({'prefix_names': prefix_names})
+        self.metadata['graph'].update({'prefix_names': add_prefix})
         self.update_metadata()
 
         return
@@ -385,6 +376,105 @@ class SEdge(DataGraph):
         super().set_edges(source_nodes, target_nodes, weights)
 
         return
+
+    def save_feature_matrix(self):
+        """
+        Save feature matrices in self.Xs and self.Xt, if they exist.
+        """
+
+        # Save equivalent feature matrix
+        if self.Xs is not None:
+            save_npz(self.path2Xs, self.Xs)
+        if self.Xt is not None:
+            save_npz(self.path2Xt, self.Xt)
+
+        return
+
+    # #####################
+    # Graph edition methods
+    # #####################
+
+    # WARNING: The following methods have not been implemented for sedges yet.
+    # The versions in the parent class are incomplete for sedges, because they
+    # do not update the attributes that are specific of sedges (self.n_source
+    # and self.n_target). For this reason, an error is raised.
+    # The implementation of this methods is not difficult, but I left it for
+    # the future...
+    def add_single_node(self, node, attributes={}):
+        """
+        Add single node
+
+        Parameters
+        ----------
+        node : str
+            Node name
+        attributes : dict, optional (default={})
+            Dictionary of attributes
+        """
+
+        logging.error("---- Method add_single_node has not been implemented "
+                      "for sedges. Since the method from the parent class "
+                      " is not appropriate, no action is taken.")
+        return
+
+    def add_single_edge(self, source, target, weight=1, attributes={}):
+        """
+        Add single edge
+
+        Parameters
+        ----------
+        source : str
+            Source node name
+        target : str
+            Target node name
+        weight : float, optional (default=1)
+            Edge weight
+        attributes : dict, optional (default={})
+            Dictionary of attributes
+        """
+
+        logging.error("---- Method add_single_edge has not been implemented "
+                      "for sedges. Since the method from the parent class "
+                      " is not appropriate, no action is taken.")
+        return
+
+    def drop_single_node(self, node):
+        """
+        Add single node
+
+        Parameters
+        ----------
+        node : str
+            Node name
+        """
+
+        logging.error("---- Method drop_single_edge has not been implemented "
+                      "for sedges. Since the method from the parent class "
+                      " is not appropriate, no action is taken.")
+        return
+
+    def disconnect_nodes(self, source, target, directed=False):
+        """
+        Disconnect nodes by removing edges
+
+        Parameters
+        ----------
+        source : str
+            Source node name
+        target : str
+            Target node name
+        directed : bool, optional (default=True)
+            True if only edge source->target should be removed
+        """
+
+        logging.error("---- Method add_single_edge has not been implemented "
+                      "for sedges. Since the method from the parent class is "
+                      "not appropriate, no action is taken.")
+        return
+
+    # ################
+    # Graph processing
+    # ################
 
     def computeSimBiGraph(self, s_min=None, n_gnodesS=None, n_gnodesT=None,
                           n_edges=None, similarity='He2', g=1,
@@ -509,95 +599,43 @@ class SEdge(DataGraph):
 
         return
 
-    def save_feature_matrix(self):
+    def reverse(self):
         """
-        Save feature matrices in self.Xs and self.Xt, if they exist.
-        """
-
-        # Save equivalent feature matrix
-        if self.Xs is not None:
-            save_npz(self.path2Xs, self.Xs)
-        if self.Xt is not None:
-            save_npz(self.path2Xt, self.Xt)
-
-        return
-
-    # WARNING: The following methods have not been implemented for sedges yet.
-    # The versions in the parent class are incomplete for sedges, because they
-    # do not update the attributes that are specific of sedges (self.n_source
-    # and self.n_target). For this reason, an error is raised.
-    # The implementation of this methods is not difficult, but I left it for
-    # the future...
-    def add_single_node(self, node, attributes={}):
-        """
-        Add single node
-
-        Parameters
-        ----------
-        node : str
-            Node name
-        attributes : dict, optional (default={})
-            Dictionary of attributes
+        Reverse the direction of the edges in the graph.
+        Note that this does not change the name of the graph.
         """
 
-        logging.error("---- Method add_single_node has not been implemented "
-                      "for sedges. Since the method from the parent class "
-                      " is not appropriate, no action is taken.")
-        return
+        # Call the reverse() method in the parent class
+        super().reverse()
 
-    def add_single_edge(self, source, target, weight=1, attributes={}):
-        """
-        Add single edge
+        # Check if all nodes start with s_ or t_
+        if self.metadata['graph']['prefix_names']:
+            # Replace t_ by s_ and viceversa in self.df_nodes
+            self.df_nodes[self.REF] = self.df_nodes[self.REF].apply(
+                lambda x: 's_' + x[2:] if x[0] == 't' else 't_' + x[2:])
 
-        Parameters
-        ----------
-        source : str
-            Source node name
-        target : str
-            Target node name
-        weight : float, optional (default=1)
-            Edge weight
-        attributes : dict, optional (default={})
-            Dictionary of attributes
-        """
+            # Replace t_ by s_ and viceversa in self.df_edges
+            # Replace prefix "s_" en source nodes by "t_"
+            self.df_edges['Source'] = self.df_edges['Source'].apply(
+                lambda x: 't_' + x[2:] if x[0] == 's' else x)
+            # Replace prefix "t_" en target nodes by "s_"
+            self.df_edges['Target'] = self.df_edges['Target'].apply(
+                lambda x: 's_' + x[2:] if x[0] == 't' else x)
+        else:
+            logging.info(
+                "-- -- Node names unchanged, because they have no prefix.")
 
-        logging.error("---- Method add_single_edge has not been implemented "
-                      "for sedges. Since the method from the parent class "
-                      " is not appropriate, no action is taken.")
-        return
+        # Update source and target in metadata
+        self.metadata['graph'].update({'source': self.label_target,
+                                       'target': self.label_source})
 
-    def drop_single_node(self, node):
-        """
-        Add single node
+        # Update attributes
+        self.n_source, self.n_target = self.n_target, self.n_source
+        self._df_edges_2_atts()
+        self._df_nodes_2_atts()
 
-        Parameters
-        ----------
-        node : str
-            Node name
-        """
-
-        logging.error("---- Method drop_single_edge has not been implemented "
-                      "for sedges. Since the method from the parent class "
-                      " is not appropriate, no action is taken.")
-        return
-
-    def disconnect_nodes(self, source, target, directed=False):
-        """
-        Disconnect nodes by removing edges
-
-        Parameters
-        ----------
-        source : str
-            Source node name
-        target : str
-            Target node name
-        directed : bool, optional (default=True)
-            True if only edge source->target should be removed
-        """
-
-        logging.error("---- Method add_single_edge has not been implemented "
-                      "for sedges. Since the method from the parent class is "
-                      "not appropriate, no action is taken.")
+        self.update_metadata()
+        
         return
 
     # def computeBinFeatures(self, Ygraph, XYgraph, field, fitXY=False,

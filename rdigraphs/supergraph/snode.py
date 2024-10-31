@@ -28,14 +28,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Graph layout.
-# fa2 is not available for python>3.8 as of Dec. 2022.
-# To allow using the rest of the code for python>3.8, we catch the error
-# to keep running.
 try:
     from fa2_modified import ForceAtlas2   # "pip install fa2_modified"
 except Exception:
     from fa2 import ForceAtlas2   # "pip install fa2"
-    logging.warning("WARNING: fa2_modufied could not be imported."
+    logging.warning("WARNING: fa2_modified could not be imported."
                     "Trying with fa2 version (requires python<3.8)")
 
 # Local imports
@@ -123,7 +120,7 @@ class DataGraph(object):
 
         # Simgraph
         # WARNING: This is actually a fake SimGraph object. SimGraph objects
-        # are used by some methods in this class, but not as class attributed.
+        # are used by some methods in this class, but not as class attributes.
         # A SimGraph attribute is declared here just to forze a link in the UML
         # diagram generated with pyreverse.
         self.sg = SimGraph(np.array([[]]))
@@ -617,6 +614,32 @@ class DataGraph(object):
 
         return
 
+    def drop_single_edge(self, label):
+        '''
+        Resets a single edge from the graph, given its label.
+
+        This is an alternative to disconnect_nodes when the graph may have
+        multiple edges between the same pair of nodes.
+
+        The edge to be removed should be identified by the fiel 'label' in the
+        dataframe of edges.
+
+        Parameters
+        ----------
+        label : str
+            Name of the node to remove.
+        '''
+
+        # Remove from df_edges the row with the given label
+        self.df_edges = self.df_edges[self.df_edges['label'] != label]
+
+        # Recompute self attributes about edges.
+        self._df_edges_2_atts()
+        # Update new graph size in metadata
+        self.update_metadata()
+
+        return
+
     def disconnect_nodes(self, source, target, directed=False):
         '''
         Drops all edges between nodes source and target.
@@ -1002,13 +1025,36 @@ class DataGraph(object):
     # ############################
     # Graph information extraction
     # ############################
-    def get_attributes(self):
+    def get_attributes(self, type='nodes'):
         """
         Returns the list of node attributes of the self snode.
+
+        Parameters
+        ----------
+        type : str {'nodes', 'edges'}, optional (default='nodes')
+            Type of attributes to return
         """
 
         # return list(set(self.df_nodes.columns) - set([self.REF]))
-        return self.metadata['nodes']['attributes']
+        return self.metadata[type]['attributes']
+    
+    def get_node_attributes(self, node):
+        """
+        Returns the attributes of a given node
+
+        Parameters
+        ----------
+        node : str
+            Name of the node
+        """
+
+        if node in self.nodes:
+            atts = self.df_nodes[self.df_nodes[self.REF] == node].to_dict(
+                orient='records')[0]
+        else:
+            atts = {}
+
+        return atts
 
     def get_nodes_by_value(self, att, value):
         """
@@ -1512,6 +1558,26 @@ class DataGraph(object):
         self.remove_feature_matrix()
         logging.warning("-- -- Nodes has been sorted. Be aware that the "
                         "feature matrix, if any has been removed")
+
+        return
+
+    def reverse(self):
+        """
+        Reverses the direction of all edges in the graph. 
+        Note that this may be done even if the graph is undirected, in which
+        case the graph will remain essentially the same. It might be useful,
+        though, as an intermediate step to make the graph directed.
+        """
+
+        # Reverse edges by simply interchanging source and target
+        self.df_edges = self.df_edges.rename(columns={'Source': 'Target',
+                                                      'Target': 'Source'})
+
+        # Update redundant snode attributes
+        self._df_edges_2_atts()
+        # Update metadata dictionary
+        self.metadata['graph'].update({'reversed': True})
+        self.update_metadata()
 
         return
 

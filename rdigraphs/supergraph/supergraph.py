@@ -10,6 +10,7 @@ import copy
 import os
 import shutil
 import collections
+import pathlib
 from tqdm import tqdm
 from scipy.optimize import linear_sum_assignment
 
@@ -381,9 +382,8 @@ class SuperGraph(object):
          """
 
         if label in self.snodes or self.is_snode(label):
-            logging.warning(
-                f'-- -- An snode named {label} already exists in the '
-                'supergraph.')
+            logging.warning(f'-- -- An snode named {label} already exists in '
+                            'the supergraph.')
             logging.warning(
                 '-- -- The old snode will be removed. Note that sedges '
                 'starting or ending in the old snode could not be consistent '
@@ -391,20 +391,98 @@ class SuperGraph(object):
             self.drop_snode(label)
 
         if out_path is None:
-            # Default path: a folder with the name in label in the standard
-            # location in the folder of snodes
-            out_path = os.path.join(self.path2snodes, label)
+            # Default path: a subfolder in the standard folder of snodes
+            out_path = pathlib.Path(self.path2snodes) / label
 
         self.snodes[label] = DataGraph(label=label, path=out_path,
                                        edge_class=edge_class)
         self.snodes[label].set_nodes(nodes, T, save_T=save_T,
-                                     T_labels=T_labels)
+                                     T_labels=T_labels, col_id=col_id)
 
         # Update metagraph
         self.metagraph.add_single_node(label, attributes)
 
         return
 
+    def makeSuperEdge(self, source, target, weight=1, elabel=None,
+                      out_path=None, source_nodes=None, target_nodes=None,
+                      Xs=None, Xt=None, attributes={}, edge_class='undirected',
+                      save_T=False):
+        """
+        Make a new sedge for the supergraph structure.
+        The sedge is created as an object (bigraph) from class SEdge, with the
+        input data in the args.
+
+        Parameters
+        ----------
+        source : str
+            Name of the source snode
+        target : str
+            Name of the target snode
+        weight : float, optional (default=1)
+            Weight of the sedge (in the supergraph)
+        elabel : str or None, optional (default=None)
+            Name of the sedge. If none, a default name is composed from the
+            source and target names
+        out_path : str or None, optional (default=None)
+            Output path
+        source_nodes : list, optional (default=None)
+            If list, a list of source nodes.
+        target_nodes : list, optional (default=None)
+            If list, a list of edge nodes.
+        attributes : dict, optional (default={})
+            Attributes of the supernode. Note that these are not attributes of
+            the nodes, but of the whole supernode, that will be stored in the
+            snode metagraph
+        edge_class : str, optional (default='undirected')
+            Type of the edges in the sedge
+        save_T : bool, optional (default=False)
+            If True, the feature matrix T is saved into an  npz file.
+         """
+
+        # Check if source and target nodes are in the supergraph
+        if not self.is_snode(source):
+            raise ValueError(f'-- -- Source node {source} is not in the '
+                                'supergraph')
+        if not self.is_snode(target):
+            raise ValueError(f'-- -- Target node {target} is not in the '
+                                'supergraph')   
+
+        # Make a default edge label if not provided
+        if elabel is None:
+            elabel = source + '_2_' + target
+
+        # Check if sedge named elabel do exists
+        if elabel in self.sedges or self.is_sedge(elabel):
+            logging.warning(f'-- -- An sedge named {label} already exists in '
+                            'the supergraph.')
+            logging.warning(
+                '-- -- The old snode will be removed. Note that sedges '
+                'starting or ending in the old snode could not be consistent '
+                'with the new one')
+            self.drop_sedge(elabel)
+
+        if out_path is None:
+            # Default path: a subfolder in the standard folder of sedges
+            out_path = pathlib.Path(self.path2snodes) / elabel
+
+        self.sedges[elabel] = SEdge(
+            label=elabel, path=out_path, label_source=source,
+            label_target=target, edge_class=edge_class)
+
+        # If source and target nodes are provided, we set them
+        if source_nodes is not None:
+            self.sedges[elabel].set_nodes(
+                nodes_orig=source_nodes, nodes_dest=target_nodes, Xs=Xs, Xt=Xt,
+                save_T=save_T)
+
+        # Update metagraph
+        attributes['label'] = elabel
+        self.metagraph.add_single_edge(source, target, weight=weight,
+                                       attributes=attributes)
+
+        return
+        
     def drop_snode(self, label):
         """
         Removes snode from the supergraph. Note that this does not remove the
@@ -417,17 +495,45 @@ class SuperGraph(object):
             Name of the snode to be removed
         """
 
-        # Deactivate snode
-        self.deactivate_snode(label)
+        # Get list of sedges starting or ending in the snode
+
+        # In self.metagraph.df_edges, get the values of the column 'label'
+        # where the values of the column 'Source' are equal to label
+        # or the values of the column 'Target' are equal to label
+        idx = self.metagraph.df_edges.index[
+            (self.metagraph.df_edges['Source'] == label) |
+            (self.metagraph.df_edges['Target'] == label)].tolist()
+        # Now we have the indices of the rows in the dataframe of edges
+        # that start or end in the snode
+
+        # First, we remove the sedges
+        if 'label' in self.metagraph.df_edges:
+            # We can get the labels of the edges
+            sedges = self.metagraph.df_edges.loc[idx, 'label'].tolist()
+
+            # Remove the sedges
+            for sedge in sedges:
+                self.drop_sedge(sedge)
+
+        # Delete snode container
+        path = pathlib.Path(self.path2snodes) / label
+        if os.path.isdir(path):
+            shutil.rmtree(path)
 
         # Drop snode from the metagraph
         self.metagraph.drop_single_node(label)
 
-        # Delete snode container
-        path = os.path.join(self.path2snodes, label)
-        if os.path.isdir(path):
-            shutil.rmtree(path)
+        # Deactivate snode
+        self.deactivate_snode(label)
+
         logging.info(f'-- -- -- snode {label} deleted')
+
+        # Remove edges with the given node.
+        # if self.n_edges > 0:
+        #     self.df_edges = self.df_edges[self.df_edges.Source != node]
+        #     self.df_edges = self.df_edges[self.df_edges.Target != node]
+        #     # Recompute self attributes about edges.
+        #     self._df_edges_2_atts()
 
         return
 
@@ -441,17 +547,19 @@ class SuperGraph(object):
             Name of the sedge to be removed
         """
 
+        # Delete sedge container
+
+        path = pathlib.Path(self.path2sedges) / label
+        # check if the path exists and is a directory, with pathlib
+        if path.is_dir():
+            shutil.rmtree(path)
+
+        # Get the path of the sedge from the sedge object        
+        self.metagraph.drop_single_edge(label)
+
+        # Remove sedge from the dictionary of active sedges
         self.deactivate_sedge(label)
 
-        # Drop edge from the metagraph
-        link = label.split("_2_")
-
-        self.metagraph.disconnect_nodes(link[0], link[1])
-
-        # Delete sedge container
-        path = os.path.join(self.path2sedges, label)
-        if os.path.isdir(path):
-            shutil.rmtree(path)
         logging.info(f'-- -- -- sedge {label} deleted')
 
         return
@@ -470,23 +578,122 @@ class SuperGraph(object):
             Output path of the duplicate
         """
 
-        if not self.is_active_snode(xlabel):
-            self.activate_snode(xlabel)
+        self.activate_snode(xlabel)
 
         # Create new snode object
-        self.makeSuperNode(ylabel, out_path=None)
+        self.makeSuperNode(ylabel, out_path=out_path)
 
         # Copy main snode attributes from the original snode
-        self.snodes[ylabel].df_nodes = copy.copy(self.snodes[xlabel].df_nodes)
-        self.snodes[ylabel].df_edges = copy.copy(self.snodes[xlabel].df_edges)
+        self.snodes = {}
+        self.snodes[ylabel].df_nodes = copy.deepcopy(
+            self.snodes[xlabel].df_nodes)
+        self.snodes[ylabel].df_edges = copy.deepcopy(
+            self.snodes[xlabel].df_edges)
         self.snodes[ylabel].T = copy.copy(self.snodes[xlabel].T)
         self.snodes[ylabel].Teq = copy.copy(self.snodes[xlabel].Teq)
         self.snodes[ylabel].save_T = self.snodes[xlabel].save_T
-        self.snodes[ylabel].metadata = copy.copy(self.snodes[xlabel].metadata)
+        self.snodes[ylabel].metadata = copy.deepcopy(
+            self.snodes[xlabel].metadata)
+
+        if out_path:
+            # paths to nodes, edges, metadata and feature matrix
+            out_path = pathlib.Path(out_path)
+            self.snodes[ylabel].path2nodes = out_path / (ylabel + '_nodes.csv')
+            self.snodes[ylabel].path2edges = out_path / (ylabel + '_edges.csv')
+            self.snodes[ylabel].path2mdata = out_path / (ylabel + '_mdata.yml')
+            self.snodes[ylabel].path2T = out_path / 'feature_matrix.npz'
 
         self.snodes[ylabel]._df_nodes_2_atts()
         self.snodes[ylabel]._df_edges_2_atts()
         self.snodes[ylabel].update_metadata()
+
+        # Update metagraph
+        # Read attributes of node xlabel in the metagraph
+        attributes = self.metagraph.get_attributes(xlabel)
+        self.metagraph.add_single_node(ylabel, attributes)
+
+        return
+
+    def duplicate_sedge(self, elabel, nlabel, out_path=None):
+        """
+        Creates a copy of a given sedge with another name.
+
+        Parameters
+        ----------
+        elabel : str
+            Name of the sedge to be duplicated
+        nlabel : str
+            Name of the new sedge
+        out_path : str or None, optional (default=None)
+            Output path of the duplicate
+        """
+
+        self.activate_sedge(elabel)
+        if self.is_sedge(nlabel):
+            logging.warning(f'-- -- An sedge named {nlabel} already exists in '
+                            'the supergraph.')
+            logging.warning('-- -- The old sedge will be removed.')
+            self.drop_sedge(nlabel)
+
+        # Create new snode object
+        source = self.sedges[elabel].label_source
+        target = self.sedges[elabel].label_target
+        self.makeSuperEdge(source, target, elabel=nlabel, out_path=out_path)
+
+        # Copy main snode attributes from the original snode
+        self.sedges[nlabel].df_nodes = copy.deepcopy(
+            self.sedges[elabel].df_nodes)
+        self.sedges[nlabel].df_edges = copy.deepcopy(
+            self.sedges[elabel].df_edges)
+        self.sedges[nlabel].T = copy.copy(self.sedges[elabel].T)
+        self.sedges[nlabel].Teq = copy.copy(self.sedges[elabel].Teq)
+        self.sedges[nlabel].save_T = self.sedges[elabel].save_T
+        self.sedges[nlabel].metadata = copy.deepcopy(
+            self.sedges[elabel].metadata)
+
+        self.sedges[nlabel].label_source = self.sedges[elabel].label_source
+        self.sedges[nlabel].label_target = self.sedges[elabel].label_target
+        self.sedges[nlabel].Xs = copy.copy(self.sedges[elabel].Xs)
+        self.sedges[nlabel].Xt = copy.copy(self.sedges[elabel].Xt)
+        self.sedges[nlabel].save_X = self.sedges[elabel].save_X
+
+        if out_path:
+            # paths to nodes, edges, metadata and feature matrix
+            out_path = pathlib.Path(out_path)
+            self.sedges[nlabel].path2nodes = out_path / (nlabel + '_nodes.csv')
+            self.sedges[nlabel].path2edges = out_path / (nlabel + '_edges.csv')
+            self.sedges[nlabel].path2mdata = out_path / (nlabel + '_mdata.yml')
+            self.sedges[nlabel].path2T = out_path / 'feature_matrix.npz'
+            # The following file names may be deprecated, as the feature
+            # matrices migh be not sparse
+            self.path2Xs = out_path / 'source_model_sparse.npz'
+            self.path2Xt = out_path / 'target_model_sparse.npz'
+
+        self.sedges[nlabel].n_source = self.sedges[elabel].n_source
+        self.sedges[nlabel].n_target = self.sedges[elabel].n_target
+
+        self.sedges[nlabel]._df_nodes_2_atts()
+        self.sedges[nlabel]._df_edges_2_atts()
+        self.sedges[nlabel].update_metadata()
+
+        # Update metagraph
+        # Get list of edge attributes
+        att_list = self.metagraph.get_attributes(type='edges')
+
+        # Copy attribute values of the edge elabel
+        df_atts = self.metagraph.df_edges.loc[
+            self.metagraph.df_edges['label'] == elabel, att_list]
+        attributes = df_atts.to_dict(orient='records')[0]
+        # Change the label
+        attributes['label'] = nlabel
+        
+        # In self.metagraph.df_edges, get location of the row with nlabel
+        # in column 'label'
+        idx = self.metagraph.df_edges.index[
+            self.metagraph.df_edges['label'] == nlabel].tolist()[0]
+        # Add attributes to the row
+        for key, value in attributes.items():
+            self.metagraph.df_edges.at[idx, key] = value
 
         return
 
@@ -923,7 +1130,6 @@ class SuperGraph(object):
                 snodes_w_features.append(label)
 
         return snodes_w_features
-
 
     # ###############
     # Snode inference
@@ -2083,61 +2289,63 @@ class SuperGraph(object):
 
         return
 
-    # def reverse_bigraph(self, xy_label, yx_label=None, path_sedge=None):
-    #     """
-    #     Given bigraph x->y, generate a reversed graph y->x by converting
-    #     source nodes into target nodes and viceversa
+    def reverse_bigraph(self, xy_label, yx_label=None, path_sedge=None,
+                        keep_active=None):
+        """
+        Given bigraph x->y, generate a reversed graph y->x by converting
+        source nodes into target nodes and viceversa
 
-    #     Parameters
-    #     ----------
-    #     xy_label : str
-    #         Name of the bigraph
-    #     yx_label : str or None, optional (default=None)
-    #         Name of the reversed graph. If None, the name is built from the
-    #         names of the source and targe nodes.
-    #     """
+        Parameters
+        ----------
+        xy_label : str
+            Name of the bigraph
+        yx_label : str or None, optional (default=None)
+            Name of the reversed graph. If None, the name is built from the
+            names of the source and targe nodes.
+        """
 
-    #     # WARNING: THIS METHOD IS UNDER CONSTRUCTION
-    #     breakpoint()
+        if keep_active is None:
+            keep_active = self.keep_active
 
-    #     if not self.is_active_sedge(xy_label):
-    #         self.activate_sedge(xy_label)
-    #     x_label = self.sedges[xy_label].metadata['graph']['source']
-    #     y_label = self.sedges[xy_label].metadata['graph']['target']
+        self.activate_sedge(xy_label)
 
-    #     if yx_label is None:
-    #         yx_label = f"{y_label}_2_{x_label}"
+        # Get names of source and target snodes
+        x_label = self.sedges[xy_label].metadata['graph']['source']
+        y_label = self.sedges[xy_label].metadata['graph']['target']
 
-    #     # #############
-    #     # Default paths
-    #     if path_sedge is None:
-    #         path_sedge = os.path.join(self.path2sedges, yx_label)
+        # Set the name of the reversed graph
+        if yx_label is None:
+            yx_label = f"{y_label}_2_{x_label}"
 
-    #     # ############
-    #     # Input sedges
-    #     eyx = SEdge(label=yx_label, path=path_sedge,
-    #                 label_source=y_label, label_target=x_label)
+        # Default paths
+        if path_sedge is None:
+            path_sedge = os.path.join(self.path2sedges, yx_label)
 
-    #     exy = self.sedges[xy_label]
+        # Duplicate sedge
+        self.duplicate_sedge(xy_label, yx_label, path_sedge)
 
-    #     # This code mmay be wrong. Check it.
-    #     nodes_orig = [x[2:] for x in exy.nodes if x[0] == "t"]
-    #     nodes_dest = [x[2:] for x in exy.nodes if x[0] == "s"]
-    #     eyx.set_nodes(nodes_orig, nodes_dest)
+        # Reverse the edges in the new sedge
+        self.sedges[yx_label].reverse()
 
-    #     nodes = [f"s_{x[2:]}" if x[0] == "t" else f"t_{x[2:]}"
-    #              for x in exy.df_nodes[self.REF]]
+        # Update metagraph
+        if 'reversed' not in self.metagraph.get_attributes(type='edges'):
+            # Add the attribute 'reversed' to all edges in the metagraph,
+            # with value False
+            self.metagraph.df_edges['reversed'] = False
 
-    #     df_edges = copy.copy(self.df_edges)
-
-    #     target_nodes = exy.df_edges.Source
-
-    #     return
+        # Add value True to atrribute 'reversed' in the new edge yx_label
+        self.metagraph.df_edges.loc[
+            (self.metagraph.df_edges['label'] == yx_label), 'reversed'] = True
+        self.metagraph.df_edges.loc[
+            (self.metagraph.df_edges['label'] == yx_label), 'Source'] = y_label
+        self.metagraph.df_edges.loc[
+            (self.metagraph.df_edges['label'] == yx_label), 'Target'] = x_label
+        return
 
     # #############################
     # Snode handling and processing
     # #############################
-    def add_snode_attributes(self, label, att, att_values):
+    def add_snode_attributes(self, label, att, att_values, fill_value=None):
         """
         Parameters
         ----------
@@ -2147,7 +2355,7 @@ class SuperGraph(object):
             Name of the attribute
             If att_values is a pandas dataframe, 'att' contains the name of
             the column in att_values that will be used as key for merging
-        values : list or pandas dataframe or dict
+        att_values : list or pandas dataframe or dict
             If list: it contains the attribute values. If names is list, it
             is a list of lists. The order of the values must correspond with
             the order of nodes in the self node.
@@ -2156,11 +2364,16 @@ class SuperGraph(object):
             such case, name
             If dict, the keys must refer to values in the reference column of
             the snode.
-        att_values : dataframe containing the attribute values
+        fill_value : None, scalar or dict, optional (default=None)
+            Specifies what to do with NaN values in the ouput dataframe
+            If None, they are not changed
+            If dict, fillna contains the value used to replace each column.
+            If scalar, all NaN's are replaced by the given scalar value
         """
 
         self.activate_snode(label)
-        self.snodes[label].add_attributes(att, att_values)
+        self.snodes[label].add_attributes(
+            att, att_values, fill_value=fill_value)
 
         return
 
