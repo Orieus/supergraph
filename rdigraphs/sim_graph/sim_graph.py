@@ -1,7 +1,7 @@
 # Python libraries
 import numpy as np
 
-import os
+import pathlib
 import logging
 from time import time
 
@@ -1400,7 +1400,7 @@ class SimGraph(ThOps):
                 # Compute the distance graph
                 D = radius_neighbors_graph(np.sqrt(X), radius=R0,
                                            mode='distance', metric=d)
-            fpath = os.path.join(out_path, f'simtest_{sim}.png')
+            fpath = pathlib.Path(out_path) / f'simtest_{sim}.png'
             self.simTest(D, R, sim, g=g, fpath=fpath, label=label)
 
         logging.info(f"      reduced to {n_edges} edges")

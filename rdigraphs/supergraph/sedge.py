@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as scsp
 from scipy.sparse import save_npz
-import os
+import pathlib
 from time import time
 
 # Local imports
@@ -43,15 +43,15 @@ class SEdge(DataGraph):
 
         Parameters
         ----------
-        label : str or None, optional (default='dg')
+        label : str or None, optional
             Name os the superedge
-        path : str or None, optional (default=None)
+        path : str or pathlib.Path or None, optional
             Path to the folder that contains, or will contain, the graph data
-        label_source : str or None, optional (default=None)
+        label_source : str or None, optional
             Generic name of the source nodes
-        label_target : str or None, optional (default=None)
+        label_target : str or None, optional
             Generic name of the target nodes
-        load_data : bool, optional (default=True)
+        load_data : bool, optional
             If True (default) the graph data are loaded.
             If False, only the graph metadata are loaded
 
@@ -93,8 +93,8 @@ class SEdge(DataGraph):
 
         if path:
             # paths to nodes, edges, metadata and feature matrix
-            self.path2Xs = os.path.join(path, 'source_model_sparse.npz')
-            self.path2Xt = os.path.join(path, 'target_model_sparse.npz')
+            self.path2Xs = pathlib.Path(path) / 'source_model_sparse.npz'
+            self.path2Xt = pathlib.Path(path) / 'target_model_sparse.npz'
 
         if (self.n_nodes > 0
                 and self.metadata['graph']['category'] != 'bigraph'):

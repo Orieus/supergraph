@@ -10,6 +10,7 @@ Created on March. 04, 2019
 """
 
 import typing
+import pathlib
 import os
 import copy
 import platform
@@ -299,16 +300,16 @@ class MenuNavigator(object):
                     elif type_arg[:4] == 'path':
 
                         # The options are in the following path:
-                        path2opts = self.paths2data[arg]
+                        path2opts = pathlib.Path(self.paths2data[arg])
                         # Read and query parameter options
-                        files_and_folders = [x for x in os.listdir(path2opts)
-                                             if x != '.DS_Store']
+                        files_and_folders = [x for x in path2opts.iterdir()
+                                             if x.name != '.DS_Store']  
 
                         param_opts = {f: f for f in files_and_folders}
                         param = self.query_options(
                             param_opts, zero_option='up')
                         if param != 'zero':
-                            param = os.path.join(path2opts, param)
+                            param = path2opts / param
                             all_params.append(param)
 
                     else:

@@ -1,17 +1,10 @@
-import os
-# import shutil
-# import _pickle as pickle
-
-# import yaml
+import pathlib
 
 import numpy as np
 import pandas as pd
-# from scipy.sparse import csr_matrix
-# import colored
 import time
 import logging
 
-# # import configparser
 from collections import Counter
 from copy import copy
 
@@ -117,11 +110,10 @@ class LabTaskManager(SgTaskManagerCMD):
         For each matrix, plot the distribution of the number of nonzero topics
         """
 
-        folders = os.listdir(self.path2tm)
+        folders = list(self.path2tm.iterdir())  
         p2p = self.path2project   # This is just to abbreviate
-        out_dir = os.path.join(p2p, self.f_struct['output'], 'source_info')
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        out_dir = p2p / self.f_struct['output'] / 'source_info'
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         models, n_items, n_topics, n_nz, r_nz = [], [], [], [], []
 
@@ -129,10 +121,10 @@ class LabTaskManager(SgTaskManagerCMD):
         for folder in folders:
 
             # Load data matrix
-            path = os.path.join(self.path2tm, folder)
-            fpath = os.path.join(path, 'modelo_sparse.npz')
+            path = self.path2tm / folder
+            fpath = path / 'modelo_sparse.npz'
 
-            if os.path.isfile(fpath):
+            if path.isfile():
                 # Load corpus data
                 logging.info(f'---- Loading model {folder}')
                 data, df_nodes = self.DM.readCoordsFromFile(
@@ -157,7 +149,7 @@ class LabTaskManager(SgTaskManagerCMD):
                 plt.ylabel('Number of documents')
                 plt.title(folder)
                 plt.show(block=False)
-                fpath = os.path.join(out_dir, f'ntopics_hist_{folder}.png')
+                fpath = out_dir / f'ntopics_hist_{folder}.png'
                 plt.savefig(fpath)
             else:
                 logging.info(f'---- Model {folder} not available')
@@ -170,8 +162,7 @@ class LabTaskManager(SgTaskManagerCMD):
                            'Ratio nonzeros (%)': r_nz})
 
         # Save summary table
-        out_path = os.path.join(p2p, self.f_struct['output'],
-                                'source_models.xls')
+        out_path = p2p / self.f_struct['output'] / 'source_models.xls'
         df.to_excel(out_path)
 
         return
@@ -199,10 +190,9 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Prepare ouput folder
         p2p = self.path2project   # This is just to abbreviate
-        out_dir = os.path.join(p2p, self.f_struct['output'], 'source_info',
-                               'equiv_classes')
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        out_dir = (
+            p2p / self.f_struct['output'] / 'source_info' / 'equiv_classes')
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         # Get the parameter of the selected collection of topic models
         if corpus == 'noACL':
@@ -213,15 +203,17 @@ class LabTaskManager(SgTaskManagerCMD):
         elif corpus == 'ACL':
             root_dir = self.path2ACL
             alg_level = True
-            path2nodenames = os.path.join(self.path2ACL, 'corpus', 'ACL',
-                                          'allmetadata.csv')
+            path2nodenames = (
+                self.path2ACL / 'corpus' / 'ACL' / 'allmetadata.csv')
             ref_col = 'ACLid'
 
         # Get paths to all folders containing a topic model file
         paths = []
-        for dir_name, subdirs, files in os.walk(root_dir, topdown=False):
-            if fname in files:
-                paths.append(dir_name)
+        root_dir = pathlib.Path(root_dir)  # Convert root_dir to a Path object
+        # Search for the file in all subdirectories
+        for file_path in root_dir.rglob(fname):
+            if file_path.is_file():              # Ensure it's a file
+                paths.append(file_path.parent)   # Append the directory
 
         # #################################
         # Computation of equivalent classes
@@ -233,9 +225,11 @@ class LabTaskManager(SgTaskManagerCMD):
         # Explore all source folders contatinig a file names modelo_sparse.npz
         for path in paths:
 
-            parent, folder = os.path.split(path)
+            parent = path.parent
+            parent = path.name
             if alg_level:
-                parent, alg = os.path.split(parent)
+                alg = parent.name
+                parent = parent.parent
                 model = f'{folder}_{alg}'
             else:
                 model = folder
@@ -288,7 +282,7 @@ class LabTaskManager(SgTaskManagerCMD):
         print(df)
 
         # Save summary table of equivalence classes
-        out_path = os.path.join(out_dir, out_fname)
+        out_path = out_dir / out_fname
         df.to_excel(out_path)
 
         return
@@ -304,12 +298,12 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Read the file names in the folder containing the xls reports
         p2p = self.path2project   # This is just to abbreviate
-        data_dir = os.path.join(p2p, self.f_struct['output'], 'source_info',
-                                'equiv_classes')
+        data_dir = (
+            p2p / self.f_struct['output'] / 'source_info' / 'equiv_classes')
         fname = f'equivalence_classes_ACL.xls'
 
         # Read report from file
-        fpath = os.path.join(data_dir, fname)
+        fpath = data_dir / fname
         df = pd.read_excel(fpath)
 
         # Select datat o plot
@@ -339,7 +333,7 @@ class LabTaskManager(SgTaskManagerCMD):
             ax[i].legend()
             ax[i].grid()
             key_ = key.replace(' ', '_')
-            fig[i].savefig(os.path.join(data_dir, f'{key_}.png'))
+            fig[i].savefig(data_dir / f'{key_}.png')
 
         plt.show(block=False)
 
@@ -371,15 +365,14 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Select all models for the given corpus:
         # The mixed corpus is excluded
-        folders = os.listdir(self.path2tm)
+        folders = list(self.path2tm.iterdir())
         models = [f for f in folders if (f.split('_')[0] == corpus)
                   and (f != 'FECYT_AI_SCOPUS_AI_PATSTAT_AI_120')]
 
         # Output folder
         p2p = self.path2project   # This is just to abbreviate
-        out_dir = os.path.join(p2p, self.f_struct['output'], 'thresholding')
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        out_dir = p2p / self.f_struct['output'] / 'thresholding'
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         radius, comp_time, n_edges, density, cc, cmax = {}, {}, {}, {}, {}, {}
 
@@ -388,7 +381,7 @@ class LabTaskManager(SgTaskManagerCMD):
         for model in models:
 
             # Select topic model
-            path = os.path.join(self.path2tm, model)
+            path = self.path2tm / model
 
             # #####################
             # Document-topic matrix
@@ -449,30 +442,30 @@ class LabTaskManager(SgTaskManagerCMD):
 
             # Save summary table
             fname = f'radius_effect_{model}.xls'
-            out_path = os.path.join(out_dir, fname)
+            out_path = out_dir / fname
             df.to_excel(out_path)
 
         # Plot results
         xlabel = 'Radius'
 
-        fpath = os.path.join(out_dir, f'{corpus}_comp_time.png')
+        fpath = out_dir / f'{corpus}_comp_time.png'
         self._plot_results(
             radius, comp_time, xlabel, 'Time', fpath, xscale='lin')
 
-        fpath = os.path.join(out_dir, f'{corpus}_density.png')
+        fpath = out_dir / f'{corpus}_density.png'
         self._plot_results(
             radius, density, xlabel, 'Density', fpath, xscale='lin')
 
-        fpath = os.path.join(out_dir, f'{corpus}_n_edges.png')
+        fpath = out_dir / f'{corpus}_n_edges.png'
         self._plot_results(
             radius, n_edges, xlabel, 'Number of edges', fpath, xscale='lin')
 
-        fpath = os.path.join(out_dir, f'{corpus}_CC.png')
+        fpath = out_dir / f'{corpus}_CC.png'
         self._plot_results(
             radius, cc, xlabel, 'Number of connected components', fpath,
             xscale='lin')
 
-        fpath = os.path.join(out_dir, f'{corpus}_maxCC.png')
+        fpath = out_dir / f'{corpus}_maxCC.png'
         self._plot_results(
             radius, cmax, xlabel, 'Largest connected component', fpath,
             xscale='lin')
@@ -518,7 +511,7 @@ class LabTaskManager(SgTaskManagerCMD):
         fully_connected = n_links is None
 
         # Select all models for the given corpus:
-        folders = os.listdir(self.path2tm)
+        folders = list(self.path2tm.iterdir())
         models = [f for f in folders if (f.split('_')[0] == corpus)
                   and (f != 'FECYT_AI_SCOPUS_AI_PATSTAT_AI_120')]
 
@@ -530,7 +523,7 @@ class LabTaskManager(SgTaskManagerCMD):
         for model in models:
 
             # Select topic model
-            path = os.path.join(self.path2tm, model)
+            path = self.path2tm / model
             p2p = self.path2project   # This is just to abbreviate
 
             # #####################
@@ -641,30 +634,29 @@ class LabTaskManager(SgTaskManagerCMD):
 
             # Save summary table
             fname = f'{tag}_{model}.xls'
-            out_dir = os.path.join(p2p, self.f_struct['output'], 'sampling')
-            if not os.path.exists(out_dir):
-                os.makedirs(out_dir)
-            out_path = os.path.join(out_dir, fname)
+            out_dir = p2p / self.f_struct['output'] / 'sampling'
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / fname
             df.to_excel(out_path)
 
         # Plot results
         xlabel = 'Number of nodes'
-        fpath = os.path.join(out_dir, f'{tag}_{corpus}_comp_time.png')
+        fpath = out_dir, f'{tag}_{corpus}_comp_time.png'
         self._plot_results(n_nodes, comp_time, xlabel, 'Time', fpath)
 
-        fpath = os.path.join(out_dir, f'{tag}_{corpus}_CC.png')
+        fpath = out_dir / f'{tag}_{corpus}_CC.png'
         self._plot_results(
             n_nodes, cc, xlabel, 'Number of connected components', fpath)
 
-        fpath = os.path.join(out_dir, f'{tag}_{corpus}_maxCC.png')
+        fpath = out_dir / f'{tag}_{corpus}_maxCC.png'
         self._plot_results(
             n_nodes, cmax, xlabel, 'Largest connected component', fpath)
 
-        fpath = os.path.join(out_dir, f'{tag}_{corpus}_relCC.png')
+        fpath = out_dir / f'{tag}_{corpus}_relCC.png'
         self._plot_results(
             n_nodes, c_rel, xlabel, 'Relative size of the largest CC', fpath)
 
-        fpath = os.path.join(out_dir, f'{tag}_{corpus}_rmax.png')
+        fpath = out_dir / f'{tag}_{corpus}_rmax.png'
         self._plot_results(
             n_nodes, rmax, xlabel, 'Radius', fpath, yscale='lin')
 
@@ -697,7 +689,7 @@ class LabTaskManager(SgTaskManagerCMD):
 
         Parameters
         ----------
-        path2models : str
+        path2models : str or pathlib.Path
             Path specifying the class of models to validate.
         d : float
             Distance measure (JS, He or l1)
@@ -743,7 +735,7 @@ class LabTaskManager(SgTaskManagerCMD):
                           "must be specified")
 
         # Read the type of topic models from the path name.
-        tm_class = os.path.split(path2models)[-1]
+        tm_class = path2models.name
 
         # Take the similarity measure corresponding to the selected distance
         smap = {'JS': 'He2->JS', 'He': 'He2', 'l1': 'l1'}
@@ -753,10 +745,9 @@ class LabTaskManager(SgTaskManagerCMD):
         # Paths to topic models
 
         # Path to the folder containing the node names (same for all)
-        path2nodenames = os.path.join(
-            self.path2ACL, 'corpus/ACL/allmetadata.csv')
+        path2nodenames = self.path2ACL / 'corpus' / 'ACL' / 'allmetadata.csv'
         # Path to the folder containing the folders with the topic models
-        folders = os.listdir(path2models)
+        folders = list(path2models.iterdir())
 
         # #######################
         # Load co-citations graph
@@ -836,7 +827,7 @@ class LabTaskManager(SgTaskManagerCMD):
             logging.info(f"-- Model {i} ({model}) out of {len(models)}")
 
             # Select topic model
-            path = os.path.join(path2models, model)
+            path = path2models / model
 
             # #####################
             # Document-topic matrix
@@ -958,11 +949,10 @@ class LabTaskManager(SgTaskManagerCMD):
             preffix = f'{corpus}_{sim}_U_{n_gnodes}_{n_edges_t}_ig{int(1/g)}'
 
         fname = f'{preffix}_{tm_class}.xls'
-        out_dir = os.path.join(self.path2project, self.f_struct['output'],
-                               'validation', preffix, 'results')
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        out_path = os.path.join(out_dir, fname)
+        out_dir = (self.path2project / self.f_struct['output'] / 'validation'
+                   / preffix / 'results')
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / fname
         df.to_excel(out_path)
 
         return
@@ -1018,16 +1008,15 @@ class LabTaskManager(SgTaskManagerCMD):
         print(f"Number of edges: {n_edges_t}")
 
         # Data folder
-        folder = os.path.join(self.path2ACL, 'models', 'tm')
-        tm_classes = [x for x in os.listdir(folder)
-                      if os.path.isdir(os.path.join(folder, x))]
+        folder = self.path2ACL / 'models' / 'tm'
+        tm_classes = [x for x in folder.iterdir() if (folder / x).is_dir()]
 
-        # Validate modesl, one by one..
+        # Validate models, one by one..
         for tmc in tm_classes:
             logging.info(
                 f'-- Validating models of type {tmc} with {d} similarity')
 
-            path2models = os.path.join(folder, tmc)
+            path2models = folder / tmc
             out_dir = self._validate_topic_models(
                 path2models, d, spf, rescale=rescale, n_edges_t=n_edges_t,
                 g=g, cd_algs=cd_algs, metrics=metrics)
@@ -1050,8 +1039,8 @@ class LabTaskManager(SgTaskManagerCMD):
         # ###############
 
         # Read the file names in the folder containing the xls reports
-        data_dir = os.path.join(path, 'results')
-        data_files = sorted(os.listdir(data_dir))
+        data_dir = path / 'results'
+        data_files = sorted(list(data_dir.iterdir()))
 
         # Read all result files
         sim, rescale, n_nodes, n_edges, ig, tm_class = [], [], [], [], [], []
@@ -1060,7 +1049,7 @@ class LabTaskManager(SgTaskManagerCMD):
         #                 'ig', 'tm_class']
         for f in data_files:
             if f.endswith('.xls'):
-                fname = os.path.splitext(f)[0]
+                fname = f.stem
                 fname_parts = fname.split('_')
 
                 # Read parameters from the file name
@@ -1079,7 +1068,7 @@ class LabTaskManager(SgTaskManagerCMD):
                 tm_class.append(tm_class_f)
 
                 # Read report from file
-                fpath = os.path.join(data_dir, f)
+                fpath = data_dir / f
                 df_dict[fname] = pd.read_excel(fpath)
                 params[fname] = {
                     'tmc': tm_class_f, 'n': n_nodes_f, 'e': n_edges_f,
@@ -1156,12 +1145,11 @@ class LabTaskManager(SgTaskManagerCMD):
                                     plt.show(block=False)
 
                                     # Save figure
-                                    out_dir = os.path.join(path, 'figs')
+                                    out_dir = path / 'figs'
                                     tag = '_'.join(fname_parts[0:5])
                                     fname = f'{tag}_{ab}.png'
-                                    if not os.path.exists(out_dir):
-                                        os.makedirs(out_dir)
-                                    out_path = os.path.join(out_dir, fname)
+                                    out_dir.mkdir(parents=True, exist_ok=True)
+                                    out_path = out_dir / fname
                                     plt.savefig(out_path)
 
         return
@@ -1179,8 +1167,8 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Create graph object
         logging.info(f'-- Loading GRAPH from {path}')
-        label = path.split(os.path.sep)[-1]
-
+        label = path.name
+        
         metrics = ['degree', 'centrality', 'betweenness', 'cluster_coef',
                    'pageRank']
 
@@ -1196,14 +1184,14 @@ class LabTaskManager(SgTaskManagerCMD):
             print(df.head(10))
 
             # Save the top n rows
-            path2old = os.path.join(self.path2project, self.f_struct['output'],
-                                    f'topNaN_{label}_{parameter}.xlsx')
+            path2old = (self.path2project / self.f_struct['output'] /
+                        f'topNaN_{label}_{parameter}.xlsx')
             df.iloc[:n].to_excel(path2old, index=False, encoding='utf-8')
             print(f"-- -- Top {n} saved in {path2old}")
 
             # Save the top n
-            path2out = os.path.join(self.path2project, self.f_struct['output'],
-                                    f'top_{label}_{parameter}.xlsx')
+            path2out = (self.path2project / self.f_struct['output'] /
+                        f'top_{label}_{parameter}.xlsx')
 
             # Remove rows with NaNs. This is aimed for citation graphs
             if 'eid' in df.columns:
@@ -1230,7 +1218,7 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Activate selected snode
         logging.info(f'-- Loading GRAPH from {path}')
-        label = path.split(os.path.sep)[-1]
+        label = path.name
         self.SG.activate_snode(label)
         # ref_name = self.SG.snodes[label].REF
 
@@ -1269,9 +1257,8 @@ class LabTaskManager(SgTaskManagerCMD):
                 print(df.head(10))
 
                 # Save the top n
-                path2out = os.path.join(
-                    self.path2project, self.f_struct['output'],
-                    f'top_{label}_{parameter}.xlsx')
+                path2out = (self.path2project, self.f_struct['output'] /
+                            f'top_{label}_{parameter}.xlsx')
 
                 df.iloc[:n].to_excel(path2out, index=True, encoding='utf-8')
                 print(f"-- -- Top {n} saved in {path2out}")
@@ -1366,8 +1353,8 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Load vocabulary
         corpus = blei.BleiCorpus(
-            os.path.join(path2tm, 'PlanEst_AIall-mult.dat'),
-            os.path.join(path2tm, 'PlanEst_AI_vocabulary.gensim'))
+            path2tm / 'PlanEst_AIall-mult.dat',
+            path2tm / 'PlanEst_AI_vocabulary.gensim')
 
         # Initialize word_count matrix, containing the number of repetitions of
         # each word in each community.
@@ -1376,7 +1363,7 @@ class LabTaskManager(SgTaskManagerCMD):
         word_count = np.zeros((ncoms, vocab_size))
 
         # Map project references to indices
-        path2nodenames = os.path.join(path2tm, 'docs_metadata.csv')
+        path2nodenames = path2tm / 'docs_metadata.csv'
         df_allnodes = pd.read_csv(path2nodenames, usecols=[ref_col])
 
         # This is not much efficient because I should run over the docs in p2c
@@ -1402,7 +1389,7 @@ class LabTaskManager(SgTaskManagerCMD):
         W = W * (np.log(W) - denom)
 
         com_keywords = self.get_keyword_descriptions(
-            os.path.join(path2tm, 'vocab.txt'), W, n_keywords=n_keywords)
+            path2tm / 'vocab.txt', W, n_keywords=n_keywords)
         com_keywords = dict(com_keywords)
 
         return W, com_keywords
@@ -1436,8 +1423,8 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Paths to data folders
         path2topicmodels = self.path2tm
-        path2graphs = os.path.join(self.path2project, 'graphs')
-        path2bigraphs = os.path.join(self.path2project, 'bigraphs')
+        path2graphs = self.path2project / 'graphs'
+        path2bigraphs = self.path2project / 'bigraphs'
 
         # #################
         # Graph of Projects
@@ -1446,10 +1433,10 @@ class LabTaskManager(SgTaskManagerCMD):
         logging.info('========== 1. Computing graph of PROJECTS')
 
         # Compute similarity graph
-        path2tm = os.path.join(path2topicmodels, topic_model)
+        path2tm = path2topicmodels / topic_model
         self.infer_sim_graph(path2tm, 'He2', n0=n0, n_epn=n_epn,
                              label=gP_label)
-        gP_path = os.path.join(path2graphs, gP_label)
+        gP_path = path2graphs / gP_label
 
         self.SG.remove_isolated_nodes(gP_label)
 
@@ -1473,7 +1460,7 @@ class LabTaskManager(SgTaskManagerCMD):
 
         # Tranduce graph of entities
         logging.info('========== 2. Computing bigraph PROJECTS->ORGANIZATIONS')
-        gO_path = os.path.join(path2graphs, gO_label)
+        gO_path = path2graphs / gO_label
         self.inferBGfromA(gP_path, att_O, t_label=gO_label, e_label=bgPO_label)
 
         # ####################################
@@ -1502,9 +1489,9 @@ class LabTaskManager(SgTaskManagerCMD):
         # Transduce graph of communities
         att = comm_label
         self.inferBGfromA(gP_path, att, t_label=gC_label, e_label=bgPC_label)
-        bgPC_path = os.path.join(path2bigraphs, bgPC_label)
+        bgPC_path = path2bigraphs / bgPC_label
         self.transduce(bgPC_path, 1)
-        gC_path = os.path.join(path2graphs, gC_label)
+        gC_path = path2graphs / gC_label
         comm_label2 = "Supercomunidad"
         self.detectCommunities(cd_algorithm, gC_path, comm_label=comm_label2)
 
@@ -1523,7 +1510,7 @@ class LabTaskManager(SgTaskManagerCMD):
         # Graph Organizations-Communities
 
         logging.info('========== 4. Computing bigraph PROJECTS->COMMUNITIES')
-        bgOC_path = os.path.join(path2bigraphs, bgOC_label)
+        bgOC_path = path2bigraphs / bgOC_label
         self.SG.transitive_graph(bgOC_label, bgPO_label, bgPC_label)
 
         # #############

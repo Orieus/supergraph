@@ -8,7 +8,6 @@ from __future__ import print_function    # For python 2 copmatibility
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
-import os
 import pathlib
 import logging
 import yaml
@@ -620,22 +619,22 @@ class DataManager(object):
             # path = filedialog.askopenfilename(initialdir=os.getcwd(),
             #                                   title=msg_g0)
             fpath = filedialog.askdirectory(
-                initialdir=os.path.dirname(self.path2project), title=msg_g1)
+                initialdir=self.path2project.parent, title=msg_g1)
             root.update()     # CLose the filedialog window
             root.destroy()    # Destroy the tkinter object.
 
         # If there is only one file with extension npz, take it
-        fnpz = [f for f in os.listdir(fpath) if f.split('.')[-1] == 'npz']
+        fnpz = [f for f in pathlib.Path(fpath).iterdir() if f.suffix == '.npz']
         if len(fnpz) == 1:
-            path2topics = os.path.join(fpath, fnpz[0])
+            path2topics = fpath / fnpz[0]
         # otherwise, take the one with the specified names
         elif sparse:
-            path2topics = os.path.join(fpath, 'modelo_sparse.npz')
+            path2topics = fpath / 'modelo_sparse.npz'
         else:
-            path2topics = os.path.join(fpath, 'modelo.npz')
+            path2topics = fpath / 'modelo.npz'
 
         if path2nodenames is None:
-            path2nodenames = os.path.join(fpath, 'docs_metadata.csv')
+            path2nodenames = fpath / 'docs_metadata.csv'
 
         # ##############
         # LOADING TOPICS
@@ -659,7 +658,7 @@ class DataManager(object):
         # #############
         # LOADING NAMES
 
-        if os.path.isfile(path2nodenames):
+        if path2nodenames.is_file():
             df_nodes = pd.read_csv(path2nodenames, usecols=[ref_col])
         else:
             logging.info(f'-- -- File {path2nodenames} with node names does '

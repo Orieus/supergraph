@@ -1819,9 +1819,9 @@ class DataGraph(object):
 
         Parameters
         ----------
-        parameter : str {'centrality', 'degree', 'betweenness', 'closeness', \
-                    'centrality', 'pageRank', 'cluster_coef', 'katz',
-                    'abs_in_degree', 'abs_out_degree'}
+        parameter : str {'abs_in_degree', 'abs_out_degree', 'betweenness',
+            'centrality', 'closeness', 'cluster_coef', 'degree', 'harmonic',
+            'katz', 'load', 'pageRank'}
             Local parameter to compute
         label : str or None, optional (default=None)
             Name of the node attribute that will contain the local parameter
@@ -1829,8 +1829,9 @@ class DataGraph(object):
 
         # Check if parameter is available.
         valid_params = [
-            'centrality', 'degree', 'betweenness', 'closeness', 'pageRank',
-            'cluster_coef', 'katz', 'abs_in_degree', 'abs_out_degree']
+            'abs_in_degree', 'abs_out_degree', 'betweenness', 'centrality',
+            'closeness', 'cluster_coef', 'degree', 'harmonic', 'katz', 'load',
+            'pageRank']
         if parameter not in valid_params:
             logging.warning(f"-- Parameter {parameter} not available. No "
                             "action taken")
@@ -1897,6 +1898,13 @@ class DataGraph(object):
             C = dict(G.out_degree())
 
         elif parameter == 'betweenness':
+            logging.warning(
+                'The edge weights must be greater than zero. The algorithm is '
+                'not guaranteed to be correct if edge weights are floating '
+                'point numbers. See https://networkx.org/documentation/stable/'
+                'reference/algorithms/generated/networkx.algorithms.centrality'
+                '.betweenness_centrality.html#networkx.algorithms.centrality'
+                '.betweenness_centrality for more details')
             C = nxalg.betweenness_centrality(
                 G, k=3, normalized=True, weight='weight', endpoints=False,
                 seed=None)

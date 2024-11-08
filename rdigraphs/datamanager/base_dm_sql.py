@@ -12,7 +12,7 @@ Created on May 11 2018
 """
 
 from __future__ import print_function    # For python 2 copmatibility
-import os
+import pathlib
 import pandas as pd
 import MySQLdb     # conda install mysqlclient
 import sqlite3
@@ -102,8 +102,7 @@ class BaseDMsql(object):
                 # sqlite3
                 # sqlite file will be in the root of the project, we read the
                 # name from the config file and establish the connection
-                db_fname = os.path.join(self._path2db,
-                                        self.dbname + '.db')
+                db_fname = pathlib.Path(self._path2db) /(self.dbname + '.db')
                 print("---- Connecting to {}".format(db_fname))
                 self._conn = sqlite3.connect(db_fname)
                 self._c = self._conn.cursor()
@@ -612,7 +611,7 @@ class BaseDMsql(object):
             Name of the table
         fileformat : str {'xlsx', 'pkl'}
             Type of output file
-        path : str
+        path : str or pathlib.Path
             Route to the output folder
         filename : str
             Name of the output file
@@ -623,7 +622,7 @@ class BaseDMsql(object):
         """
 
         # Path to the output file
-        fpath = os.path.join(path, filename)
+        fpath = pathlib.Path(path) / filename
 
         # Read data:
         if cols is list:

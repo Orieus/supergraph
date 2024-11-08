@@ -7,7 +7,6 @@ import pandas as pd
 import scipy.sparse as scsp
 import logging
 import copy
-import os
 import shutil
 import collections
 import pathlib
@@ -205,20 +204,20 @@ class SuperGraph(object):
 
         Parameters
         ----------
-        snode : str or None, optional (default=None)
+        snode : str or None, optional
             If None, an empty supergraph is created.
             Otherwise, the given snode is added to the supergraph structure
-        path : str or None, optional (default=None)
+        path : str or pathlib.Path or None, optional
             Path to the supergraph folder
-        path2snodes : str or None, optional (default=None)
+        path2snodes : str or None, optional
             Path to the snodes folder. If None, snodes will be located in
             folder 'snodes' from the input path
-        path2sedges : str or None, optional (default=None)
+        path2sedges : str or None, optional
             Path to the sedges folder. If None, sedges will be located in
             folder 'sedges' from the input path
-        label : str, optional (default='sg')
+        label : str, optional
             Name of the supegraph
-        keep_active : bool, optional (default=False)
+        keep_active : bool, optional
             If True, all supergraph components loaded from memory or generated
             by some method are preserved in memory.
             If False, some methods may deactivate snodes or sedges to free some
@@ -238,20 +237,21 @@ class SuperGraph(object):
         # Metagraph variables.
         # The metagraph is the graph describing the supergraph structure of
         # snodes and sedges
-        self.path = path     # Location of the metagraph files.
+        if path is not None:
+            self.path = pathlib.Path(path)  # Location of the metagraph files.
         self.metagraph = DataGraph(label="metagraph", path=path)
 
         # Location of snodes:
         if path is not None and path2snodes is None:
-            self.path2snodes = os.path.join(path, 'snodes')   # Default path
+            self.path2snodes = pathlib.Path(path) / 'snodes'   # Default path
         else:
-            self.path2snodes = path2snodes
+            self.path2snodes = pathlib.Path(path2snodes)
 
         # Location of sedges
         if path is not None and path2sedges is None:
-            self.path2sedges = os.path.join(path, 'sedges')   # Default path
+            self.path2sedges = pathlib.Path(path) / 'sedges'   # Default path
         else:
-            self.path2sedges = path2sedges
+            self.path2sedges = pathlib.Path(path2sedges)
 
         # Add node if provided.
         if snode is not None:
@@ -271,8 +271,8 @@ class SuperGraph(object):
         """
 
         for label in self.metagraph.nodes:
-            snode_folder = os.path.join(self.path2snodes, label)
-            if not os.path.isdir(snode_folder):
+            snode_folder = self.path2snodes / label
+            if not snode_folder.is_dir():
                 logging.warning(f'---- Graph {label} does no longer exist. '
                                 f' Removed from the supergraph structure')
                 self.drop_snode(label)
@@ -287,8 +287,8 @@ class SuperGraph(object):
                  & (self.metagraph.df_edges['Target'] == target), 
                 'label'].values[0]
 
-            sedge_folder = os.path.join(self.path2sedges, label)
-            if not os.path.isdir(sedge_folder):
+            sedge_folder = self.path2sedges / label
+            if not sedge_folder.is_dir():
                 logging.warning(f'---- Bigraph {label} does no longer exist.'
                                 f' Removed from the supergraph structure')
                 self.drop_sedge(label)
@@ -517,9 +517,10 @@ class SuperGraph(object):
 
         # Delete snode container
         path = pathlib.Path(self.path2snodes) / label
-        if os.path.isdir(path):
+        # check if the path exists and is a directory, with pathlib
+        if path.is_dir():
             shutil.rmtree(path)
-
+ 
         # Drop snode from the metagraph
         self.metagraph.drop_single_node(label)
 
@@ -784,7 +785,7 @@ class SuperGraph(object):
         
         # Check if sedge named e_label do exists
         if self.is_snode(label):
-            path = os.path.join(self.path2snodes, label)
+            path = self.path2snodes / label
             self.snodes[label] = DataGraph(label=label, path=path)
 
         else:
@@ -810,7 +811,7 @@ class SuperGraph(object):
             return
         
         if self.is_sedge(label):
-            path = os.path.join(self.path2sedges, label)
+            path = self.path2sedges / label
             self.sedges[label] = SEdge(label=label, path=path)
 
         else:
@@ -954,7 +955,7 @@ class SuperGraph(object):
                     # If the snode is not in memory, we read the snode from
                     # file without loading the whole data. Only the metadata
                     # is actually needed.
-                    path = os.path.join(self.path2snodes, label)
+                    path = self.path2snodes / label
                     snode = DataGraph(label=label, path=path, load_data=False)
                     snode.describe()   
 
@@ -963,7 +964,7 @@ class SuperGraph(object):
                     self.sedges[label].describe()
                 else:
                     # Read sedge metadata if not in memory
-                    path = os.path.join(self.path2sedges, label)
+                    path = self.path2sedges / label
                     sedge = SEdge(label=label, path=path, load_data=False)
                     sedge.describe()
             else:
@@ -1026,7 +1027,7 @@ class SuperGraph(object):
                 md = self.snodes[label].metadata
             elif self.is_snode(label):
                 # Read metadata from file.
-                path = os.path.join(self.path2snodes, label)
+                path = self.path2snodes / label
                 snode = DataGraph(label=label, path=path, load_data=False)
                 md = snode.metadata
             else:
@@ -1040,7 +1041,7 @@ class SuperGraph(object):
                 md = self.sedges[label].metadata
             elif self.is_sedge(label):
                 # Read metadata from file.
-                path = os.path.join(self.path2sedges, label)
+                path = self.path2sedges / label
                 sedge = SEdge(label=label, path=path, load_data=False)
                 md = sedge.metadata
             else:
@@ -1182,9 +1183,9 @@ class SuperGraph(object):
         # #############
         # Default paths
         if path_snode is None:
-            path_snode = os.path.join(self.path2snodes, target)
+            path_snode = self.path2snodes / target
         if path_sedge is None:
-            path_sedge = os.path.join(self.path2sedges, e_label)
+            path_sedge = self.path2sedges / e_label
 
         # ############
         # Source snode
@@ -1323,9 +1324,9 @@ class SuperGraph(object):
         # #############
         # Default paths
         if path_snode is None:
-            path_snode = os.path.join(self.path2snodes, target)
+            path_snode = self.path2snodes / target
         if path_sedge is None:
-            path_sedge = os.path.join(self.path2sedges, e_label)
+            path_sedge = self.path2sedges / e_label
 
         # ############
         # Source snode
@@ -1436,9 +1437,9 @@ class SuperGraph(object):
         # #############
         # Default paths
         if path_snode is None:
-            path_snode = os.path.join(self.path2snodes, target)
+            path_snode = self.path2snodes / target
         if path_sedge is None:
-            path_sedge = os.path.join(self.path2sedges, e_label)
+            path_sedge = self.path2sedges / e_label
 
         # ############
         # Source snode
@@ -1661,7 +1662,7 @@ class SuperGraph(object):
                             "It will be removed to create the new one.")
             self.drop_sedge(e_label)
 
-        path2sedge = os.path.join(self.path2sedges, e_label)
+        path2sedge = self.path2sedges / e_label
         self.sedges[e_label] = SEdge(
             label=e_label, path=path2sedge,
             label_source=s_label, label_target=t_label)
@@ -2170,7 +2171,7 @@ class SuperGraph(object):
         # #############
         # Default paths
         if path_sedge is None:
-            path_sedge = os.path.join(self.path2sedges, e_label)
+            path_sedge = self.path2sedges / e_label
 
         # ############
         # Input sedges
@@ -2319,7 +2320,7 @@ class SuperGraph(object):
 
         # Default paths
         if path_sedge is None:
-            path_sedge = os.path.join(self.path2sedges, yx_label)
+            path_sedge = self.path2sedges / yx_label
 
         # Duplicate sedge
         self.duplicate_sedge(xy_label, yx_label, path_sedge)
@@ -2844,8 +2845,7 @@ class SuperGraph(object):
 
         # Save edges
         if len(df_edges) > 0:
-            fpath = os.path.join(self.sedges[e_label].path2graph,
-                                 f'halo_{e_label}.csv')
+            fpath = self.sedges[e_label].path2graph / f'halo_{e_label}.csv'
             df_edges.to_csv(fpath, index=False, columns=df_edges.columns,
                             sep=',', encoding='utf-8')
         else:

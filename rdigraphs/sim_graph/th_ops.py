@@ -6,7 +6,7 @@ import numpy as np
 import logging
 import sys
 import csv
-import os
+import pathlib
 import random
 
 from time import time
@@ -231,13 +231,13 @@ class ThOps(object):
         ----------
         X : scipy.sparse.csr or numpy.array
             Matrix of node attribute vectors
-        blocksize : int, optional (default=25_000)
+        blocksize : int, optional
             Size (number of rows) of each block in blocwise processing.
         useGPU : bool, optional (default=False)
             If True, matrix operations are accelerated using GPU
-        tmp_folder : str or None, optional (defautl = None)
+        tmp_folder : str or pathlib.Path or None, optional
             Name of the folder to save temporary files
-        save_every : int, optional (default=1e300)
+        save_every : int, optional
             Maximum size of the growing lists. The output lists are constructed
             incrementally. To avoid memory overload, growing lists are saved
             every time they reach this size limit. The full lists are thus
@@ -269,13 +269,13 @@ class ThOps(object):
         suff = random.randint(0, 1e10)
         if tmp_folder is None:
             # Default temporary folder
-            self.tmp_folder = os.path.join('.', 'tmp')
+            self.tmp_folder = pathlib.Path('.') / 'tmp'
         else:
-            self.tmp_folder = tmp_folder
+            self.tmp_folder = pathlib.Path(tmp_folder)
 
         # Path to the files storing (temporarily) edges and weights
-        self.fpath_edges = os.path.join(self.tmp_folder, f'edges_{suff}.csv')
-        self.fpath_values = os.path.join(self.tmp_folder, f'values_{suff}.csv')
+        self.fpath_edges = self.tmp_folder / f'edges_{suff}.csv'
+        self.fpath_values = self.tmp_folder / f'values_{suff}.csv'
 
         # This prevents some occasional but large debug messages from numba
         logging.getLogger('numba').setLevel(logging.WARNING)
@@ -298,8 +298,8 @@ class ThOps(object):
 
         # If mode == 'w', create output folder if it does not exist (if
         # mode == 'a', the output folder and files must already exist)
-        if mode == 'w' and not os.path.isdir(self.tmp_folder):
-            os.makedirs(self.tmp_folder)
+        if mode == 'w' and not self.tmp_folder.is_dir(): 
+            self.tmp_folder.mkdir()
 
         # Save edge_list
         with open(self.fpath_edges, mode) as f:
@@ -331,7 +331,7 @@ class ThOps(object):
         with open(self.fpath_edges, 'r') as f:
             reader = csv.reader(f)
             edges = [(int(x[0]), int(x[1])) for x in map(tuple, reader)]
-        os.remove(self.fpath_edges)
+        self.fpath_edges.unlink()
 
         # Get values, if requested
         if get_values:
@@ -339,7 +339,7 @@ class ThOps(object):
             with open(self.fpath_values, 'r') as f:
                 reader = csv.reader(f)
                 values = [float(x[0]) for x in reader]
-            os.remove(self.fpath_values)
+            self.fpath_values.unlink()
         else:
             values = None
 

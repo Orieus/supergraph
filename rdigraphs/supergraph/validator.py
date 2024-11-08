@@ -1,4 +1,4 @@
-import os
+import pathlib
 import random
 import numpy as np
 import scipy.sparse as scsp
@@ -168,18 +168,19 @@ class Validator(object):
         # DATA LOCATION
 
         # If there is only one file with extension npz, take it
-        fnpz = [f for f in os.listdir(fpath) if f.split('.')[-1] == 'npz']
+        fpath = pathlib.Path(fpath)
+        fnpz = [f for f in fpath.iterdir() if f.suffix == '.npz']
         if len(fnpz) == 1:
-            path2topics = os.path.join(fpath, fnpz[0])
+            path2topics = fpath / fnpz[0]
         # otherwise, take the one with the specified names
         else:
-            path2topics = os.path.join(fpath, self.models_fname)
+            path2topics = fpath / self.models_fname
 
         if path2nodenames is None:
-            path2nodenames = os.path.join(fpath, 'docs_metadata.csv')
+            path2nodenames = fpath / 'docs_metadata.csv'
 
         if path2params is None:
-            path2params = os.path.join(fpath, 'train.config')
+            path2params = fpath / 'train.config'
 
         # ##############
         # LOADING TOPICS
@@ -208,7 +209,7 @@ class Validator(object):
         # #############
         # LOADING NAMES
 
-        if os.path.isfile(path2nodenames):
+        if path2nodenames.is_file():
             # I don't like this try, but I have found cases where using
             # lineterminator='\n' the column name is taken with a final '\r'
             # which causes a mismatch error with the expected ref_col name.
@@ -237,7 +238,7 @@ class Validator(object):
         cf = configparser.ConfigParser()
         cf.read_string(config_string)
 
-        if os.path.isfile(path2params):
+        if path2params.is_file():
             # We load all parameters, but only some of them will be used
             params = {
                 'input': cf.get('sec', 'input'),
@@ -263,8 +264,8 @@ class Validator(object):
         ref_col = corpus_data['ref_col']
         # Path to the file containing the metadata, including the node names,
         # which is common to all models
-        path2nodenames = corpus_data['path2nodenames']
-        path2models = corpus_data['path2models']
+        path2nodenames = pathlib.Path(corpus_data['path2nodenames'])
+        path2models = pathlib.Path(corpus_data['path2models'])
 
         # Path to topic models
         logging.info('-- Reading nodes from the topic model folders')
@@ -279,7 +280,7 @@ class Validator(object):
         # to known what docs are there in the topic models
 
         # Get an arbitrary topic model to get the list of nodes
-        folder_names = os.listdir(path2models)
+        folder_names = list(path2models.iterdir())
         folder_names = [
             x for x in folder_names if x[:4] == self.corpus_name[:4]]
 
@@ -511,8 +512,8 @@ class Validator(object):
         ref_col = corpus_data['ref_col']
         # Path to the file containing the metadata, including the node names,
         # which is common to all models
-        path2nodenames = corpus_data['path2nodenames']
-        path2models = corpus_data['path2models']
+        path2nodenames = pathlib.Path(corpus_data['path2nodenames'])
+        path2models = pathlib.Path(corpus_data['path2models'])
 
         # ####################
         # Load reference graph
@@ -532,9 +533,9 @@ class Validator(object):
         # Get an arbitrary topic model to get the list of nodes
         logging.info('-- Loading topic models')
         fpath = None
-        for folder in os.listdir(path2models):
+        for folder in path2models.iterdir():
             p = path2models / folder
-            if os.path.isdir(p) and self.models_fname in os.listdir(p):
+            if p.is_dir() and self.models_fname in list(p.iterdir()):
                 fpath = p
                 break
         if fpath is None:
@@ -593,9 +594,9 @@ class Validator(object):
 
         Parameters
         ----------
-        path2models : str
+        path2models : str or pathlib.Path
             Path specifying the class of models to validate.
-        path2nodenames : str
+        path2nodenames : str or pathlib.Path
             Path to the file containing the node names
         corpus : str
             Name of the corpus
@@ -612,7 +613,9 @@ class Validator(object):
 
         # Paths to the models to analyze. The name of each model is also the
         # name of the folder that contains it.
-        models = [f for f in os.listdir(path2models)
+
+        path2models = pathlib.Path(path2models)
+        models = [f for f in path2models.iterdir()
                   if f.split('_')[0] == corpus and 'interval' in f]
 
         # ####################
@@ -644,7 +647,7 @@ class Validator(object):
             logging.info(f"-- Model {i} ({model}) out of {len(models)}")
 
             # Select topic model
-            path = os.path.join(path2models, model)
+            path = path2models / model
 
             # #####################
             # Document-topic matrix
@@ -726,9 +729,9 @@ class Validator(object):
 
         Parameters
         ----------
-        path2models : str
+        path2models : str or pathlib.Path
             Path specifying the class of models to validate.
-        path2nodenames : str
+        path2nodenames : str or pathlib.Path
             Path to the file containing the node names
         corpus : str
             Name of the corpus
@@ -750,7 +753,8 @@ class Validator(object):
 
         # Paths to the models to analyze. The name of each model is also the
         # name of the folder that contains it.
-        models = [f for f in os.listdir(path2models)
+        path2models = pathlib.Path(path2models)
+        models = [f for f in path2models.iterdir()
                   if f.split('_')[0] == corpus and 'interval' in f]
 
         # Load reference graph from DB or from a file in the supergraph
@@ -781,7 +785,7 @@ class Validator(object):
             logging.info(f"-- Model {i} ({model}) out of {len(models)}")
 
             # Select topic model
-            path = os.path.join(path2models, model)
+            path = path2models / model
 
             # #####################
             # Document-topic matrix
@@ -898,9 +902,8 @@ class Validator(object):
         # Save summary table
         preffix = f'{corpus}_{n_gnodes}_{epn}'
         fname = f'{preffix}.xls'
-        if not os.path.exists(self.path2rgs):
-            os.makedirs(self.path2rgs)
-        out_path = os.path.join(self.path2rgs, fname)
+        self.path2rgs.mkdir(parents=True, exist_ok=True)
+        out_path = self.path2rgs / fname
         df.to_excel(out_path)
 
         # IF snodes have not been removed, the supergraph structure is saved
@@ -942,7 +945,7 @@ class Validator(object):
 
         Parameters
         ----------
-        path2models : str
+        path2models : str or pathlib.Path
             Path specifying the class of models to validate.
         corpus : str
             Name of the corpus
@@ -956,7 +959,8 @@ class Validator(object):
 
         # Paths to the models to analyze. The name of each model is also the
         # name of the folder that contains it.
-        models = [f for f in os.listdir(path2models)
+        path2models = pathlib.Path(path2models)
+        models = [f for f in path2models.iterdir()
                   if f.split('_')[0] == corpus and 'interval' in f]
 
         # Get list of unique parameterizations.
@@ -1071,9 +1075,8 @@ class Validator(object):
         # Save summary table
         preffix = f'{corpus}_{n_nodes}_{self.epn}'
         fname = f'{preffix}.xls'
-        if not os.path.exists(self.path2var):
-            os.makedirs(self.path2var)
-        out_path = os.path.join(self.path2var, fname)
+        self.path2vars.mkdir(parents=True, exist_ok=True)
+        out_path = self.path2var / fname
         df.to_excel(out_path)
 
         return
@@ -1121,7 +1124,7 @@ class Validator(object):
 
         # Read the file names in the folder containing the xls reports
         data_dir = self.path2rgs
-        data_files = sorted(os.listdir(data_dir))
+        data_files = sorted(list(data_dir.iterdir()))
 
         # Read all result files
         # sim, rescale, n_nodes, n_edges, ig, tm_class = [], [], [], [], [], []
@@ -1133,8 +1136,8 @@ class Validator(object):
         #                 'ig', 'tm_class']
         no_files = True
         for f in data_files:
-            if f.endswith('.xls'):
-                fname = os.path.splitext(f)[0]
+            if f.suffix() == '.xls':
+                fname = f.stem()
                 fname_parts = fname.split('_')
 
                 # Read parameters from the file name
@@ -1145,7 +1148,7 @@ class Validator(object):
                 epn.append(epn_f)
 
                 # Read report from file
-                fpath = os.path.join(data_dir, f)
+                fpath = data_dir / f
                 df_dict[fname] = pd.read_excel(fpath)
                 params[fname] = {'n': n_nodes_f, 'e': epn_f}
 
@@ -1232,12 +1235,11 @@ class Validator(object):
                     plt.show(block=False)
 
                     # Save figure
-                    out_dir = os.path.join(self.path2rgs, 'figs')
+                    out_dir = self.path2rgs / 'figs'
                     tag = '_'.join(fname_parts[0:5])
                     fname = f'{tag}_{ab}.png'
-                    if not os.path.exists(out_dir):
-                        os.makedirs(out_dir)
-                    out_path = os.path.join(out_dir, fname)
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    out_path = out_dir / fname
                     plt.savefig(out_path)
 
         return
@@ -1249,7 +1251,7 @@ class Validator(object):
 
         Parameters
         ----------
-        path: str
+        path: str or pathlib.Path
             Path to data
         """
 
@@ -1259,7 +1261,7 @@ class Validator(object):
 
         # Read the file names in the folder containing the xls reports
         data_dir = self.path2var
-        data_files = sorted(os.listdir(data_dir))
+        data_files = sorted(list(data_dir.iterdir()))
 
         # Read all result files
         n_nodes, epn = [], []
@@ -1268,8 +1270,9 @@ class Validator(object):
         params, df_dict = {}, {}
         # fname_struct = ['corpus', 'n_nodes', 'epn']
         for f in data_files:
-            if f.endswith('.xls'):
-                fname = os.path.splitext(f)[0]
+
+            if f.suffix == '.xls':
+                fname = f.stem
                 fname_parts = fname.split('_')
 
                 # Read parameters from the file name
@@ -1280,7 +1283,7 @@ class Validator(object):
                 epn.append(epn_f)
 
                 # Read report from file
-                fpath = os.path.join(data_dir, f)
+                fpath = data_dir / f
                 df_dict[fname] = pd.read_excel(fpath)
                 params[fname] = {'n': n_nodes_f, 'e': epn_f}
 
@@ -1367,9 +1370,8 @@ class Validator(object):
                     out_dir = str(self.path2var / 'figs')
                     tag = '_'.join(fname_parts[0:5])
                     fname = f'{tag}_{ab}.png'
-                    if not os.path.exists(out_dir):
-                        os.makedirs(out_dir)
-                    out_path = os.path.join(out_dir, fname)
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    out_path = out_dir / fname
                     plt.savefig(out_path)
 
         return
@@ -1384,9 +1386,9 @@ class Validator(object):
 
         Parameters
         ----------
-        path2models : str
+        path2models : str or pathlib.Path
             Path specifying the class of models to validate.
-        path2nodenames : str
+        path2nodenames : str or pathlib.Path
             Path to the file containing the node names
         corpus : str
             Name of the corpus
@@ -1402,7 +1404,8 @@ class Validator(object):
 
         # Paths to the models to analyze. The name of each model is also the
         # name of the folder that contains it.
-        models = [f for f in os.listdir(path2models)
+        path2models = pathlib.Path(path2models)
+        models = [f for f in path2models.iterdir()
                   if f.split('_')[0] == corpus and 'interval' in f]
 
         # Selected models for the analysis:
@@ -1441,7 +1444,7 @@ class Validator(object):
                 f"-- Model {i} ({model}) out of {len(selected_models)}")
 
             # Select topic model
-            path = os.path.join(path2models, model)
+            path = path2models / model
 
             # #####################
             # Document-topic matrix
@@ -1535,8 +1538,7 @@ class Validator(object):
         # Save summary table
         preffix = f'{corpus}_{epn}'
         fname = f'{preffix}.xls'
-        if not os.path.exists(self.path2sca):
-            os.makedirs(self.path2sca)
+        self.path2sca.mkdir(parents=True, exist_ok=True)
         out_path = self.path2sca / fname
         df.to_excel(out_path)
 
@@ -1605,7 +1607,7 @@ class Validator(object):
 
         # Read the file names in the folder containing the xls reports
         data_dir = self.path2sca
-        data_files = sorted(os.listdir(data_dir))
+        data_files = sorted(list(data_dir.iterdir()))
 
         data2legend = {x: [] for x in cols2legend}
         data2axis = {x: [] for x in cols2x + cols2y}
@@ -1615,8 +1617,8 @@ class Validator(object):
         # fname_struct = ['corpus', 'sim', 'rescale', 'n_nodes', 'n_edges',
         #                 'ig', 'tm_class']
         for f in data_files:
-            if f.endswith('.xls'):
-                fname = os.path.splitext(f)[0]
+            if f.suffix == '.xls':
+                fname = f.stem
                 fname_parts = fname.split('_')
 
                 # Read parameters from the file name
@@ -1626,7 +1628,7 @@ class Validator(object):
                                  for x, loc in fname2fig.items()}
 
                 # Read report from file
-                fpath = os.path.join(data_dir, f)
+                fpath = data_dir / f
                 df_dict[fname] = pd.read_excel(fpath)
 
                 for x in data2legend:
@@ -1709,12 +1711,11 @@ class Validator(object):
                     plt.show(block=False)
 
                 # Save figure
-                out_dir = os.path.join(self.path2sca, 'figs')
+                out_dir = self.path2sca / 'figs'
                 tag = '_'.join(fname_parts)
                 fname = f'{tag}_{ab}.png'
-                if not os.path.exists(out_dir):
-                    os.makedirs(out_dir)
-                out_path = os.path.join(out_dir, fname)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_path = out_dir / fname
                 plt.savefig(out_path)
 
         return
@@ -1728,7 +1729,7 @@ class Validator(object):
 
         Parameters
         ----------
-        path2models : str
+        path2models : str or pathlib.Path
             Path specifying the class of models to validate.
         corpus : str
             Name of the corpus
@@ -1746,7 +1747,8 @@ class Validator(object):
 
         # Paths to the models to analyze. The name of each model is also the
         # name of the folder that contains it.
-        models = [f for f in os.listdir(path2models)
+        path2models = pathlib.Path(path2models)
+        models = [f for f in path2models.iterdir()
                   if f.split('_')[0] == 'ntpc']
 
         # #########################
@@ -1760,7 +1762,7 @@ class Validator(object):
             if reset or not self.SG.is_snode(graph_name):
 
                 # Select topic model
-                path = os.path.join(path2models, model)
+                path = path2models / model
 
                 # #####################
                 # Document-topic matrix
@@ -1939,9 +1941,8 @@ class Validator(object):
         # Save summary table
         preffix = f'{corpus}_ntpc_{ntpc}_{n_gnodes}_{epn}'
         fname = f'{preffix}.xls'
-        if not os.path.exists(self.path2sub):
-            os.makedirs(self.path2sub)
-        out_path = os.path.join(self.path2sub, fname)
+        self.path2sub.mkdir(parents=True, exist_ok=True)
+        out_path = self.path2sub / fname
         df.to_excel(out_path)
 
         # IF snodes have not been removed, the supergraph structure is saved
@@ -2023,7 +2024,7 @@ class Validator(object):
 
         # Read the file names in the folder containing the xls reports
         data_dir = self.path2sub
-        data_files = sorted(os.listdir(data_dir))
+        data_files = sorted(list(data_dir.iterdir()))
 
         data2legend = {x: [] for x in cols2legend}
         data2axis = {x: [] for x in cols2x + cols2y}
@@ -2033,8 +2034,8 @@ class Validator(object):
         # fname_struct = ['corpus', 'sim', 'rescale', 'n_nodes', 'n_edges',
         #                 'ig', 'tm_class']
         for f in data_files:
-            if f.endswith('.xls'):
-                fname = os.path.splitext(f)[0]
+            if f.suffix == '.xls':
+                fname = f.stem
                 fname_parts = fname.split('_')
 
                 # Read parameters from the file name
@@ -2044,7 +2045,7 @@ class Validator(object):
                                  for x, loc in fname2fig.items()}
 
                 # Read report from file
-                fpath = os.path.join(data_dir, f)
+                fpath = data_dir / f
                 df_dict[fname] = pd.read_excel(fpath)
 
                 for x in data2legend:
@@ -2138,13 +2139,12 @@ class Validator(object):
                     plt.show(block=False)
 
                     # Save figure
-                    out_dir = os.path.join(self.path2sub, 'figs')
+                    out_dir = self.path2sub / 'figs'
                     var_names = list(metadata.keys())
                     tag = '_'.join(f'{k}_{v}' for k, v in zip(var_names, md))
                     fname = f'{tag}_{ab}.png'
-                    if not os.path.exists(out_dir):
-                        os.makedirs(out_dir)
-                    out_path = os.path.join(out_dir, fname)
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    out_path = out_dir / fname
                     plt.savefig(out_path)
                     plt.close()
 

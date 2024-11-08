@@ -153,7 +153,6 @@ class SgTaskManager(object):
             print(f'Moved to {old_p2p}')
 
         # Create project folder and subfolders
-        # os.makedirs(self.path2project)
         self.path2project.mkdir()
 
         self.update_folders(f_struct)
@@ -217,15 +216,6 @@ class SgTaskManager(object):
             path2d = p2p / self.f_struct[d]
             if not path2d.exists():
                 path2d.mkdir()
-
-        # Import subfolders
-        # Use this type of code to create subfolders
-        # path2import = os.path.join(p2p, self.f_struct['import'])
-        # subfolders = ['import_xxxx', 'import_yyyy', 'import_zzzz]
-        # for d in subfolders:
-        #     path2d = os.path.join(path2import, self.f_struct[d])
-        #     if not os.path.exists(path2d):
-        #         os.makedirs(path2d)
 
         return
 
@@ -542,7 +532,7 @@ class SgTaskManager(object):
         """
 
         # Create graph object
-        label = path.split(os.path.sep)[-1]
+        label = pathlib.Path(path).name
 
         return self.SG.get_attributes(label)
         # return self.get_communities(path)
@@ -554,7 +544,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to data
         param_group : str
             Name of the class of attributes to get
@@ -566,7 +556,7 @@ class SgTaskManager(object):
         """
 
         # Create graph object
-        label = path.split(os.path.sep)[-1]
+        label = pathlib.Path(path).name
         metadata = self.SG.get_metadata(label)
 
         atts = None
@@ -615,7 +605,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to data
         args : tuple, optional
             Possible extra arguments that are ignored
@@ -627,7 +617,7 @@ class SgTaskManager(object):
         """
 
         # Create graph object
-        e_label = path.split(os.path.sep)[-1]
+        e_label = pathlib.Path(path).name
 
         # Load source snode
         s_label, t_label = self.SG.get_terminals(e_label)
@@ -641,7 +631,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to data
         args : tuple, optional
             Possible extra arguments that are ignored
@@ -653,7 +643,7 @@ class SgTaskManager(object):
         """
 
         # Create graph object
-        e_label = path.split(os.path.sep)[-1]
+        e_label = pathlib.Path(path).name
 
         # Load source snode
         s_label, t_label = self.SG.get_terminals(e_label)
@@ -883,7 +873,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2graph : str
+        path2graph : str or pathlib.Path
             Path to graph
         """
 
@@ -892,7 +882,7 @@ class SgTaskManager(object):
             return
 
         # Load graph object
-        graph_name = path2graph.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path2graph).name
         dg = DataGraph(path=path2graph, label=graph_name)
 
         # Call the export method in DM
@@ -909,7 +899,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2graph : str
+        path2graph : str or pathlib.Path
             Path to graph
         """
 
@@ -918,7 +908,7 @@ class SgTaskManager(object):
             return
 
         # Load bigraph object
-        graph_name = path2graph.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path2graph).name
         dg = DataGraph(path=path2graph, label=graph_name)
 
         # Call the export method in DM
@@ -1028,14 +1018,14 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to the model
         n0 : int or float, optional (default=0).
             Number of nodes. If 0 all nodes are imported
         """
 
         # Name of the selected corpus topic model
-        graph_name = os.path.split(path)[-1]
+        graph_name = pathlib.Path(path).name
 
         # #########
         # LOAD DATA
@@ -1289,7 +1279,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to the graph to add the new attribute
         db : str
             Type of the database storing the data
@@ -1317,7 +1307,7 @@ class SgTaskManager(object):
             orderOptions=None)
 
         # Create graph object
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
         self.SG.add_snode_attributes(graph_name, att_ref, att_values)
 
         # Save modified snode
@@ -1335,14 +1325,14 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to the graph where the attribute must be removed
         att : str
             Name of the attribute
         """
 
         # Create graph object
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
 
         # In the current version of the SuperGraph class, snode activation must
         # be done before calling to the snode method. Maybe I should consider
@@ -1375,11 +1365,11 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2snode : str
+        path2snode : str or pathlib.Path
             Path to the supernode
         """
 
-        label = path2snode.split(os.path.sep)[-1]
+        label = pathlib.Path(path2snode).name
         self.SG.activate_snode(label)
         self.SG.snodes[label].pprint(10)
         self._deactivate()
@@ -1392,11 +1382,11 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2sedge : str
+        path2sedge : str or pathlib.Path
             Path to the superedge
         """
 
-        label = path2sedge.split(os.path.sep)[-1]
+        label = pathlib.Path(path2sedge).name
         self.SG.activate_sedge(label)
         self.SG.sedges[label].pprint()
         self._deactivate()
@@ -1409,11 +1399,11 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to snode
         """
 
-        label = path.split(os.path.sep)[-1]
+        label = pathlib.Path(path).name
         self.SG.drop_snode(label)
         logging.info(f'---- Graph {label} has been removed.')
 
@@ -1425,11 +1415,11 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to sedge
         """
 
-        label = path.split(os.path.sep)[-1]
+        label = pathlib.Path(path).name
         self.SG.drop_sedge(label)
 
         logging.info(f'---- Bigraph {label} has been removed.')
@@ -1487,7 +1477,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to graph
         th : str
             Threshold. Edges with smaller weight are removed.
@@ -1509,14 +1499,14 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to graph
         comm : str
             Name of the community
         """
 
         # Create graph object
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
         new_graph_name = f'sub_{graph_name}{comm}'
 
         att = comm
@@ -1540,12 +1530,12 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to snode
         """
 
         # Create graph object
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
 
         # Remove isolated nodes
         self.SG.remove_isolated_nodes(graph_name)
@@ -1562,14 +1552,14 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2tables : str
+        path2tables : str or pathlib.Path
             Path to tables
         path2snode : str
             Path to snode
         """
 
         # Source node
-        s_label = path2snode.split(os.path.sep)[-1]
+        s_label = pathlib.Path(path2snode).name
 
         # Load csv_files
         path2_p2r = path2tables / 'researcher_project.csv'
@@ -1666,11 +1656,11 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to snode
         """
 
-        s_label = os.path.split(path)[-1]
+        s_label = pathlib.Path(path).name
         t_label = f'eq_{s_label}'
         e_label = s_label + '_2_' + t_label
 
@@ -1869,7 +1859,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to the model
         sim : str
             Similarity measure
@@ -1882,7 +1872,7 @@ class SgTaskManager(object):
 
         # Name of the selected corpus topic model
         if label is None:
-            graph_name = os.path.split(path)[-1]
+            graph_name = pathlib.Path(path).name
         else:
             graph_name = label
 
@@ -2092,12 +2082,12 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to the sedge (snode is inferred from the sedge name)
         """
 
         # Load sedge
-        label = path.split(os.path.sep)[-1]
+        label = pathlib.Path(path).name
 
         # Compute transduced graph
         th = 0.9
@@ -2122,15 +2112,15 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path_xm : str
+        path_xm : str or pathlib.Path
             Path to first bipartite graph (sedge)
-        path_my : str
+        path_my : str or pathlib.Path
             Path to second bipartite graph (sedge)
         """
 
         # Identify sedges XM and MY
-        xmlabel = path_xm.split(os.path.sep)[-1]
-        mylabel = path_my.split(os.path.sep)[-1]
+        xmlabel = pathlib.Path(path_xm).name
+        mylabel = pathlib.Path(path_my).name
 
         # Activate sedges to get some info from them
         self.SG.activate_sedge(xmlabel)
@@ -2178,12 +2168,12 @@ class SgTaskManager(object):
         ----------
         parameter : str
             Local parameter to compute
-        path : str
+        path : str or pathlib.Path
             Path to snode
         """
 
         # Create graph object
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
 
         # Local graph analysis
         self.SG.local_snode_analysis(graph_name, parameter=parameter)
@@ -2241,6 +2231,8 @@ class SgTaskManager(object):
 
         Parameters
         ----------
+        path : str or pathlib.Path
+            Path to snode
         community : str
             Community detection algorithm
         parameter : str
@@ -2249,7 +2241,7 @@ class SgTaskManager(object):
 
         logging.info(f'-- Computing community metric: {parameter}')
         # Create graph object
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
         dg = DataGraph(label=graph_name, path=path)
 
         # Local graph analysis
@@ -2266,11 +2258,11 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path1 : str
+        path1 : str or pathlib.Path
             Path to 1st snode
         comm1 : str
             Name of the partition from 1st snode
-        path2 : str
+        path2 : str or pathlib.Path
             Path to 2nd snode
         comm2 : str
             Name of the partition from 2nd snode
@@ -2281,9 +2273,9 @@ class SgTaskManager(object):
         logging.info(f'-- Computing communities with metric: {metric}')
 
         # Create graph objects
-        graph1_name = path1.split(os.path.sep)[-1]
+        graph1_name = pathlib.Path(path1).name
         self.SG.activate_snode(graph1_name)
-        graph2_name = path1.split(os.path.sep)[-1]
+        graph2_name = pathlib.Path(path2).name
         if path2 != path1:
             self.SG.activate_snode(graph2_name)
 
@@ -2326,14 +2318,14 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2snode : str
+        path2snode : str or pathlib.Path
             Path to snode
         attribute: str
             Snode attribute used to color the graph
         """
 
         # Create graph object
-        graph_name = path2snode.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path2snode).name
 
         # Parameters
         if self.SG.get_metadata(graph_name)['nodes']['n_nodes'] > 100:
@@ -2362,7 +2354,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2snode : str
+        path2snode : str or pathlib.Path
             Path to snode
         attribute: str
             Snode attribute used to color the graph
@@ -2377,8 +2369,8 @@ class SgTaskManager(object):
             to represent the attribute value for each node.
         """
 
-        # Create graph obje
-        graph_name = path2snode.split(os.path.sep)[-1]
+        # Create graph object
+        graph_name = pathlib.Path(path2snode).name
 
         att_2_idx = self.SG.display_graph(graph_name, attribute, path=path)
 
@@ -2400,7 +2392,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-        path2sedge : str
+        path2sedge : str or pathlib.Path
             Path to the bipartite graph. The bigraph (sedge) and both the
             source and target snodes must already exist in the supergraph
             structure.
@@ -2442,7 +2434,7 @@ class SgTaskManager(object):
         # Export graph to Halo format
 
         # Get names of bipartite graph and terminal graphs
-        e_label = path2sedge.split(os.path.sep)[-1]
+        e_label = pathlib.Path(path2sedge).name
         s_label, t_label = self.SG.get_terminals(e_label)
 
         # # Export graph to Halo format
@@ -2493,7 +2485,7 @@ class SgTaskManager(object):
         # Display graph
 
         # Move to halo folder temporarily
-        owd = os.getcwd()
+        owd = Path.cwd()
         os.chdir(self.path2halo)
 
         port = 8080
@@ -2522,7 +2514,7 @@ class SgTaskManager(object):
 
         Parameters
         ----------
-            path : str
+            path : str or pathlib.Path
                 Path to the graph
             feature : str
                 Name of the local feature
@@ -2532,7 +2524,7 @@ class SgTaskManager(object):
         n = 400
 
         # Create graph obje
-        label = path.split(os.path.sep)[-1]
+        label = pathlib.Path(path).name
 
         self.SG.activate_snode(label)
 
@@ -2740,14 +2732,14 @@ class SgTaskManagerCMD(SgTaskManager):
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path to graph
         mode : str
             If 'newgraph', create a new snode with the subgraph
         """
 
         # Read number of nodes in the graph
-        graph_name = path.split(os.path.sep)[-1]
+        graph_name = pathlib.Path(path).name
         atts = self.SG.get_attributes(graph_name)
         n_nodes = atts['nodes']['n_nodes']
 

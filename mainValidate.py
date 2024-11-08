@@ -12,7 +12,7 @@ Created on June 18 2018
 
 """
 
-import os
+import pathlib
 import argparse
 
 # Local imports
@@ -40,7 +40,9 @@ if args.p is None:
     while project_path is None or project_path == "":
         project_path = input('-- Write the path to the project to load or '
                              'create: ')
-if os.path.isdir(args.p):
+project_path = pathlib.Path(project_path)
+
+if project_path.is_dir():
     option = 'load'
 else:
     option = 'create'
@@ -50,9 +52,9 @@ query_needed = False
 # Create SuperGraph Project
 # paths2data stores the path to all source data that might be needed by the
 # task manager
-paths2data = {'topicmodels': os.path.join(args.source, 'models'),
-              'agents': os.path.join(args.source, 'agents'),
-              'ACL_models': os.path.join(args.source, 'ACL_models')}
+paths2data = {'topicmodels': path2source / 'models',
+              'agents': path2source / 'agents',
+              'ACL_models': path2source / 'ACL_models'}
 tm = ValTaskManager(project_path, paths2data)
 
 # ########################
@@ -61,14 +63,13 @@ tm = ValTaskManager(project_path, paths2data)
 
 # paths2data stores the path to all folders that might be needed by the
 # menu navigator. They may differ from those needed by the task manager
-paths2data = {'graphs': os.path.join(project_path, 'graphs'),
-              'bigraphs': os.path.join(project_path, 'bigraphs'),
-              'topicmodels': os.path.join(args.source, 'models'),
-              'agents': os.path.join(args.source, 'agents'),
-              'ACL_models': os.path.join(args.source,
-                                         'ACL_models/models/tm'),
-              'validation': os.path.join(project_path, 'output', 'validation')}
-path2menu = 'val_menu.yaml'
+paths2data = {'graphs': project_path / 'graphs',
+              'bigraphs': project_path / 'bigraphs',
+              'topicmodels': path2source / 'models',
+              'agents': path2source / 'agents',
+              'ACL_models': path2source / 'ACL_models' / 'models' / 'tm',
+              'validation': project_path / 'output' / 'validation'}
+path2menu = pathlib.Path('val_menu.yaml')
 
 # ##############
 # Call navigator
