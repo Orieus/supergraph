@@ -2,14 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Main program for the RDIgraph analyzer
-
-Created on June 18 2018
-
 @author: Jesús Cid Sueiro
-
-# For profiling: kernprof -lv mainRDIgraph.py ...
-
 """
 
 import pathlib
@@ -23,15 +16,15 @@ from rdigraphs.sgtaskmanager import SgTaskManager
 # #######################
 # Configurable parameters
 # #######################
-
+breakpoint()
 # Set tu True if you want to regenerate the graph data
 reset_graph = True
 
 # Select project:
 n = 10
-path2project = pathlib.Path('..') / 'projects' / f'new_cordisAI_{n}topics'
+path2project = pathlib.Path('..') / 'projects' / f'cordisPA_{n}topics'
 path2source = pathlib.Path('..') / 'datasets'
-G = 'Cordis_Kwds3_AI_topics'
+G = 'patstat_DC_cancer'
 params = {'select_all': True, 'n_topics': f'topics{n}'}
 
 # Graph generation
@@ -77,6 +70,8 @@ else:
 
 # Import nodes and attributes
 graphs = tm.get_graphs_with_features()
+breakpoint()
+
 if G not in graphs:
     tm.import_snode_from_table(
         G, n0=0, sampling_factor=1, params=params)

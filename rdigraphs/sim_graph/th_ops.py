@@ -266,7 +266,7 @@ class ThOps(object):
         # Note that the names of these temporary files has a random suffix to
         # avoid colissions with other files being used for other processes
         random.seed(time())
-        suff = random.randint(0, 1e10)
+        suff = random.randint(0, int(1e10))
         if tmp_folder is None:
             # Default temporary folder
             self.tmp_folder = pathlib.Path('.') / 'tmp'

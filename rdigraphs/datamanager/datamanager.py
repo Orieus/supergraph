@@ -328,7 +328,7 @@ class DataManager(object):
 
             # Log results
             logging.info(f"-- -- Dataset {table_name} with {len(df_table)} "
-                         f" documents loaded in {time() - t0:.2f} secs.")
+                         f" entries loaded in {time() - t0:.2f} secs.")
 
             self.__check_embeddings(df_table.columns)
 
@@ -347,13 +347,13 @@ class DataManager(object):
         else:
             path2texts = pathlib.Path(self.path2table / 'corpus')
 
-        # Read data from files
+        # Read parquet files in folder path2texts
         df = dd.read_parquet(path2texts)
         dfsmall = df.sample(frac=sampling_factor, random_state=0)
 
         with ProgressBar():
             df_table = dfsmall.compute()
-
+        
         if table_name in {'SemanticScholar', 'SemanticScholar_emb'}:
 
             # Remove unrelevant fields
@@ -437,6 +437,10 @@ class DataManager(object):
             mapping = {'projectID': col_id,
                        params['n_topics']: 'embeddings'}
             df_table.rename(columns=mapping, inplace=True)
+        
+        elif table_name in {'OA_DC_topics'}:
+
+            pass
 
         elif table_name in {'OA_DC_AI_topics'}:
 
@@ -468,22 +472,22 @@ class DataManager(object):
         elif table_name.startswith('star'):
 
             # Remove unrelevant fields
-            # Available fields are: start', 'end', 'tar file', 'source', 'tsne_1', 
-            # 'tsne_2', 'set', 'cluster in z', 'cluster in projected space', 
-            # 'RA', 'DEC', 'CRA', 'CDEC', 'main_type', 'other_types', 'main_id', 
-            # window', 'signal', 'z'
-    
             if 'select_all' in params and params['select_all']:
                 selected_cols = [
                     'start', 'end', 'tar file', 'source', 'tsne_1', 'tsne_2',
                     'set', 'cluster in z', 'cluster in projected space', 
                     'RA', 'DEC', 'CRA', 'CDEC', 'main_type', 'other_types',
-                    'main_id', '# window', 'signal', 'z']
+                    'main_id', '# window', 'signal', 'std', 'z', 'Selected by',
+                    'Label', 'Type', 'Subtype']
             else:
                 selected_cols = [
                     'set', 'cluster in z', 'cluster in projected space', 
-                    'main_type', 'other_types', 'main_id', '# window',
-                    'signal', 'z']
+                    'main_type', 'other_types', 'main_id', '# window', 'signal',
+                    'std', 'z', 'Selected by', 'Label', 'Type', 'Subtype']
+
+            # Some columns may be missing, remove them from the list
+            selected_cols = [col for col in selected_cols
+                             if col in df_table.columns]
 
             df_table = df_table[selected_cols]
 
@@ -498,9 +502,8 @@ class DataManager(object):
             l0 = len(df_table)
             df_table.drop_duplicates(subset=[col_id], inplace=True)
             l1 = len(df_table)
-            logging.info(f"-- -- {l0 - l1} duplicated documents removed")
+            logging.info(f"-- -- {l0 - l1} duplicated entries removed")
 
-            # Fill nan cells with empty strings
             df_table.fillna("", inplace=True)
 
         else:
@@ -566,6 +569,62 @@ class DataManager(object):
         logging.info(f"-- -- Corpus saved in feather file {path2feather}")
 
         return df_table, self.metadata
+
+    def import_graph_data_from_npz(self, table_name, fname=None):
+        """
+        Loads a dataframe of documents from a npz file containing a sparse
+        matrix of topics.
+
+        Parameters
+        ----------
+        fname : str
+            If a path to the npz file
+            Name of the npz file to be loaded. It is assumed to be in the folder
+            self.path2table / 'corpus'.
+            If None (default), the first npz file found in the folder will be
+            used.
+
+        Returns
+        -------
+        T : sparse.csr matrix
+            Dataframe of nodes and attributes
+        metadata : dict or None
+            A dictionary of metadata taken from the data folder.
+        """
+
+        # Loading corpus
+        logging.info(f'-- Loading dataset {fname}')
+
+        self.table_name = table_name
+        self.path2table = self._path2tables / table_name
+        self.__load_metadata()
+
+
+        # #########################################
+        # Load corpus data from its original source
+
+        if 'corpus' in self.metadata:
+            path2folder = pathlib.Path(self.metadata['corpus'])
+        else:
+            path2folder = pathlib.Path(self.path2table / 'corpus')
+        
+        # If fname is given, use it to build the path
+        if fname is None:
+            # If fname is None, take the first npz file in the folder
+            path2npz = list(path2folder.glob('*.npz'))[0]
+        else:
+            # If fname is given, use it to build the path
+            path2npz = path2folder / fname
+
+        logging.info(f"-- -- Reading npz file {path2npz}")
+        # The npz contains a sparse matrix. Read it and convert it into a
+        # pandas dataframe with a single column
+        data = np.load(path2npz, allow_pickle=True)
+
+        T = csr_matrix((data['data'], data['indices'], data['indptr']),
+                       shape=data['shape'])
+
+        return T, self.metadata
 
     def readCoordsFromFile(self, fpath=None, fields=['thetas'], sparse=False,
                            path2nodenames=None, ref_col='corpusid'):

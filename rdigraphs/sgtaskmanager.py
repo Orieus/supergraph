@@ -964,7 +964,8 @@ class SgTaskManager(object):
         logging.info(f'-- Loading dataset {table_name}')
 
         df_nodes, source_metadata = self.DM.import_graph_data_from_tables(
-            table_name, sampling_factor, params=params)
+            table_name, sampling_factor, params=params, 
+            load_feather=load_feather, save_feather=save_feather)
 
         # Load labels of features from the corpus metadata
         T_labels = None
@@ -999,6 +1000,80 @@ class SgTaskManager(object):
                               save_T=True, T_labels=T_labels)
         self.SG.sub_snode(table_name, n_gnodes, ylabel=table_name,
                           sampleT=True, save_T=True)
+
+        # #####################
+        # SHOW AND SAVE RESULTS
+
+        logging.info(f'Zero-edge graph loaded with {n_gnodes} nodes')
+        # Save graph: nodes and edges
+        self.SG.save_supergraph()
+
+        # Reset snode. This is to save memory.
+        if not self.keep_active:
+            self._deactivate()
+
+        return
+
+    def import_snode_from_npz(self, table_name, label=None, n0=0, params={}):
+        """
+        Import nodes from an npz file.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the folder containing the npz file with the nodes
+        label : str
+            Label of the snode to be created. Default is None.
+            If None, the label is taken from the name of the npz file      
+        n0 : int or float, optional (default=0).
+            Number of nodes. If 0 all nodes are imported
+        params : dict, optional (default={})
+            Dictionary of parameters (specific of the dataset)
+        """
+
+        # #########
+        # LOAD DATA
+
+        # Take the path to the data from the config file, if possible
+        logging.info(f'-- Loading dataset {table_name}')
+
+        # Name of the selected corpus topic model
+        if label is None:
+            label = table_name
+
+        # Load data matrix
+        T, source_metadata = self.DM.import_graph_data_from_npz(table_name)
+
+        # There is no list of nodes. we use integer consecutive ids
+        nodes = list(range(T.shape[0]))
+
+        # Load labels of features from the corpus metadata
+        T_labels = None
+        if 'feature_labels' in source_metadata:
+            if 'n_topics' in params:
+                T_labels = (
+                    source_metadata['feature_labels'][params['n_topics']])
+            else:
+                T_labels = source_metadata['feature_labels']
+
+        # Take a random sample
+        if n0 <= 0:
+            n_gnodes = len(nodes)
+        elif n0 < 1:
+            n_gnodes = int(n0 * len(nodes))
+        else:
+            n_gnodes = int(n0)
+
+        # ########################
+        # LOAD DATA INTO NEW SNODE
+
+        # Create datagraph with the full feature matrix
+        self.SG.makeSuperNode(label=label, nodes=nodes, T=T, save_T=True,
+                              T_labels=T_labels)
+        if n_gnodes < len(nodes):
+            # Sample the snode to get a subgraph with n_gnodes nodes.
+            self.SG.sub_snode(label, n_gnodes, ylabel=label, sampleT=True,
+                              save_T=True)
 
         # #####################
         # SHOW AND SAVE RESULTS
@@ -2312,7 +2387,7 @@ class SgTaskManager(object):
     # ###################
     # Graph visualization
     # ###################
-    def graph_layout(self, path2snode, attribute, num_iterations=50):
+    def graph_layout(self, path2snode, attribute=None, num_iterations=50):
         """
         Compute the layout of the given graph
 
@@ -2322,6 +2397,8 @@ class SgTaskManager(object):
             Path to snode
         attribute: str
             Snode attribute used to color the graph
+        num_iterations : int, optional (default=50)
+            Number of iterations for the layout algorithm
         """
 
         # Create graph object
@@ -2335,8 +2412,9 @@ class SgTaskManager(object):
             alg = 'fr'
             gravity = 1000
 
-        self.SG.graph_layout(graph_name, attribute, gravity=gravity, alg=alg,
-                             num_iterations=num_iterations)
+        self.SG.graph_layout(
+            graph_name, gravity=gravity, alg=alg, num_iterations=num_iterations,
+            attribute=attribute)
 
         # ############
         # SAVE RESULTS

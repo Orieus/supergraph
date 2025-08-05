@@ -105,12 +105,14 @@ class CommunityPlus(object):
             logging.warning(
                 f'-- -- The minimum label value is {l_min}. Label values '
                 f'will be shifted to get minimum label value equal to 0')
-        cluster_labels = np.array(cluster_labels) - l_min
+
+        cluster_labels = [x - l_min for x in cluster_labels]
 
         # Sort cluster indices by size.
         nc = int(np.max(cluster_labels)) + 1
         cluster_sizes = np.zeros(nc)
         cluster_sizes_dict = collections.Counter(cluster_labels)
+
         for c, v in cluster_sizes_dict.items():
             cluster_sizes[c] = v
 
@@ -124,6 +126,10 @@ class CommunityPlus(object):
 
         # Order clusters sizes
         cluster_sizes = cluster_sizes[new_indices]
+
+        # Convert values to int, to avoid issues with yaml serialization
+        new_cluster_labels = [int(x) for x in new_cluster_labels]
+        cluster_sizes = [int(x) for x in cluster_sizes]
 
         return new_cluster_labels, cluster_sizes
 

@@ -2,68 +2,76 @@
 # -*- coding: utf-8 -*-
 
 """
-Main program for the RDIgraph analyzer
-
-Created on June 18 2018
-
 @author: Jesús Cid Sueiro
-
-# For profiling: kernprof -lv mainRDIgraph.py ...
-
 """
 
 import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.sparse as sp
 
 # Local imports
 from rdigraphs.sgtaskmanager import SgTaskManager
 
-# #######################
-# Configurable parameters
-# #######################
+# #########################
+# Scope-specific parameters
+# #########################
 
-# Set tu True if you want to regenerate the graph data
+# Select scope:
+scope = 'AI'  # 'AI' or 'cancer'
+
+# Dictionary of scope-specific parameters
+param_dict = {
+    'AI': {'n_topics': 25, 
+           'run': 2,
+           'ns_G': 0.4,
+           'ew_G': 0.04},
+    'cancer': {'n_topics': 40,
+               'run': 8,
+               'ns_G': 0.2,
+               'ew_G': 0.02}
+    }
+
+# Take variable values from the dictionary
+n_topics = param_dict[scope]['n_topics']
+run = param_dict[scope]['run']
+ns_G = param_dict[scope]['ns_G']  # Node size in the graph
+ew_G = param_dict[scope]['ew_G']  # Edge width in the graph
+
+# ################
+# Other parameters
+# ################
+
+# Name of the folder containing the dataset
+table_name = f'cordis_{scope}_test_size_0.0_ntopics_{n_topics}_run_{run}'
+
+# Paths to data
+project_name = f'cordis{scope}_{n_topics}topics'
+path2project = pathlib.Path('..') / 'projects' / project_name
+path2source = pathlib.Path('..') / 'datasets'
+
+#  Set to True to recompute the similarity graph even if it already exists.
 reset_graph = True
 
-# Select project:
-n = 10
-path2project = pathlib.Path('..') / 'projects' / f'new_cordisAI_{n}topics'
-path2source = pathlib.Path('..') / 'datasets'
-G = 'Cordis_Kwds3_AI_topics'
-params = {'select_all': True, 'n_topics': f'topics{n}'}
-
-# Graph generation
+# Similarity graph
+G = f'Cordis{scope}{n_topics}'
+params = {'select_all': True, 'n_topics': f'topics{n_topics}'}
 sim = 'BC'
-n_epn = 10 if n == 26 else 13
-# Community detection
-# algorithm = 'louvain'
-algorithm = 'leiden'
+n_epn = None     # None to read the value from the metadata
+n_iter_layout = 100
 
 # Graph of communities
-order = 1
+cd_alg = 'leiden'
 # Threshold to sparsify the community graph
-th = 0.016 if n == 26 else 0.011
-
-# #################
-# Open task manager
-# #################
-
-paths2data = {'topicmodels': path2source / 'topic_models',
-              'agents': path2source / 'agents',
-              'ACL_models': path2source / 'ACL_models'}
-tm = SgTaskManager(path2project, paths2data, path2source)
-
-paths2data = {'graphs': path2project / 'graphs',
-              'bigraphs': path2project / 'bigraphs',
-              'topicmodels': path2source / 'topic_models',
-              'agents': path2source / 'agents'}
+th = 0.016 if n_topics == 26 else 0.011
 
 # ######################
 # Load or create project
-# ######################
+# #######################
 
+paths2data = {}
+tm = SgTaskManager(path2project, paths2data, path2source, keep_active=True)
 if not reset_graph and path2project.is_dir():
     tm.load()
     tm.show_SuperGraph()
@@ -71,37 +79,53 @@ else:
     tm.create()
     tm.setup()
 
-# ############
-# Create graph
-# ############
+# ################
+# Similarity graph
+# ################
 
 # Import nodes and attributes
-graphs = tm.get_graphs_with_features()
+graphs = tm.SG.get_snodes_with_features()
 if G not in graphs:
-    tm.import_snode_from_table(
-        G, n0=0, sampling_factor=1, params=params)
+    tm.import_snode_from_npz(table_name, label=G, n0=0, params=params)
 
-# Path to the graph
-path2G = paths2data['graphs'] / G
+# Take n_epn from the metadata of the dataset, if not given
+if n_epn is None:
+    if 'min_epn_4_1cc' not in tm.DM.metadata:
+        raise ValueError("The metadata does not contain the minimum epn for a "
+                         "unique CC. Please, set the value of n_epn manually.")
+    n_epn = tm.DM.metadata['min_epn_4_1cc'][sim]
+    print(f"-- -- Minimum epn for a unique CC: {n_epn}")
 
 # Compute similarity graph
-tm.infer_sim_graph(path2G, sim, n0=0, n_epn=n_epn)
+n_nodes = tm.SG.snodes[G].n_nodes
+n_edges = int(n_epn * n_nodes)
+tm.SG.computeSimGraph(G, n_edges=n_edges, similarity=sim, g=1,
+                      blocksize=tm.blocksize, useGPU=tm.useGPU)
 
 # Community detection
-tm.detectCommunities('cc', path2G, comm_label=None)
-tm.detectCommunities(algorithm, path2G, comm_label=None, seed=0)
+tm.SG.detectCommunities(G, alg='cc', comm_label=None)
+tm.SG.detectCommunities(G, alg=cd_alg, comm_label=None)
 
 # ##########
 # Plot graph
 # ##########
-attribute = algorithm
-tm.graph_layout(G, attribute)
-att_2_rgb = tm.display_graph(G, attribute)
 
-tm.SG.activate_snode(G)
+# Graph layout
+tm.SG.graph_layout(G, gravity=40, alg='fa2', num_iterations=n_iter_layout,
+                   attribute=cd_alg)
+# Graph display
+color_att = cd_alg
+att_2_rgb = tm.SG.display_graph(
+    G, color_att,size_att=None, base_node_size=ns_G,
+    edge_width=ew_G, show_labels=None)
+
 coms = tm.SG.snodes[G].df_nodes.leiden.tolist()
-Tmean = tm.SG.snodes[G].T.mean(axis=0)
-T2mean = (tm.SG.snodes[G].T**2).mean(axis=0)
+if isinstance(tm.SG.snodes[G].T, sp.csr_matrix):
+    Tmean = tm.SG.snodes[G].T.mean(axis=0).A
+    T2mean = (tm.SG.snodes[G].T.power(2)).mean(axis=0).A
+else:
+    Tmean = tm.SG.snodes[G].T.mean(axis=0)
+    T2mean = (tm.SG.snodes[G].T**2).mean(axis=0)
 Tstd = np.sqrt(T2mean - Tmean**2)
 flabels = tm.SG.snodes[G].metadata['feature_labels']
 
@@ -110,30 +134,40 @@ flabels = tm.SG.snodes[G].metadata['feature_labels']
 # ##################
 
 # Bipartite graph
-tm.inferBGfromA(path2G, attribute, t_label=None, e_label=None)
+attribute = cd_alg
+t_label = f"{attribute}_{G}"
+e_label = f"{G}_2_{t_label}"
+tm.SG.snode_from_atts(
+    G, attribute, target=t_label,e_label=e_label, save_T=True)
 
 # Transductive graph
 GC = tm.SG.get_sedges()[0]
-path2GC = paths2data['bigraphs'] / GC
-tm.transduce(path2GC, order)
-C = f"{algorithm}_{G}"
+tm.SG.transduce(GC)
 
 # Community detection
-path2C = paths2data['graphs'] / C
-tm.filter_edges(path2C, th)
-tm.detectCommunities(algorithm, path2C, comm_label=None)
+C = f"{cd_alg}_{G}"
+tm.SG.filter_edges_from_snode(C, th)
+tm.SG.detectCommunities(C, alg=cd_alg, comm_label=None)
+
 # Label nodes
 tm.SG.label_nodes_from_features(C, att='tag', thp=2.5)
 
 # Plot transductive graph
-tm.graph_layout(C, attribute)
-tm.display_graph(C, attribute)
+tm.SG.graph_layout(
+    C, gravity=40, alg='fr', num_iterations=100, attribute=attribute)
+color_att = attribute
+att_2_rgb2 = tm.SG.display_graph(
+    C, color_att, size_att=None, base_node_size=300, edge_width=1,
+    show_labels=None)
+
 
 # ##############################
 # Export graphs to parquet files
 # ##############################
-tm.export_2_parquet(path2G)
-tm.export_2_parquet(path2C)
+# path2G = tm.SG.path2snodes / G
+# path2C = tm.SG.path2snodes / C
+# tm.export_2_parquet(path2G)
+# tm.export_2_parquet(path2C)
 
 # #######################
 # Analyze EU projects
@@ -144,17 +178,18 @@ tm.SG.activate_snode(C)
 comm_names = tm.SG.snodes[C].df_nodes.tag.tolist()
 # Some name changes to reduce the length of the labels
 comm_names = [name.replace(' and ', ' & ') for name in comm_names]
+comm_names = [name.replace(',', ' ,\n ') for name in comm_names]
 comm_names = [name.replace('Natural Language Processing', 'NLP')
               for name in comm_names]
 comm_names = [name.replace('Environmental', 'Environm.')
               for name in comm_names]
 comm_names = [name.replace('Reinforcement', 'Reinf.') for name in comm_names]
 comm_names = [name.replace('Assessment', 'Assessm.') for name in comm_names]
+comm_names = [name.replace('Neural Networks', 'NN') for name in comm_names]
 
 # Compute a dictionary with the frequency of each community
 comm_dict = dict(zip(tm.SG.snodes[C].df_nodes.Id.tolist(), comm_names))
 eu_labels = [comm_dict[str(i)] for i in coms]
-
 freq = {name: 0 for name in comm_names}
 for label in eu_labels:
     freq[label] += 1
@@ -170,7 +205,7 @@ sorted_freqs, sorted_comm_names, sorted_colors = zip(*sorted_tuples)
 plt.figure(figsize=(10, 6))
 plt.pie(sorted_freqs, labels=sorted_comm_names, autopct='%1.1f%%',
         colors=sorted_colors)
-plt.title('EU projects by community')
+plt.title('Projects by community')
 plt.show(block=False)
 
 # Save figure in the following path
@@ -178,6 +213,7 @@ tm.SG.activate_snode(G)
 path = tm.SG.snodes[G].path2graph / 'eu_coms.png'
 plt.savefig(path)
 
+"""
 # #######################
 # Analyze spanish projects
 # #######################
@@ -298,6 +334,8 @@ plt.xticks(rotation=90)
 path = tm.SG.snodes[G].path2graph / 'funding_evolution.png'
 plt.savefig(path)
 plt.show(block=False)
+
+"""
 
 # ############################
 # Centrality measures

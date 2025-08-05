@@ -21,6 +21,7 @@ import networkx as nx
 import networkx.algorithms as nxalg
 
 # import matplotlib
+from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
 # This is to avoid plotting. The figure is generated and saved in file.
 # matplotlib.use("Agg")
@@ -33,7 +34,7 @@ try:
 except Exception:
     from fa2 import ForceAtlas2   # "pip install fa2"
     logging.warning("WARNING: fa2_modified could not be imported."
-                    "Trying with fa2 version (requires python<3.8)")
+                    "Trying with fa2 version (requires python<=3.8)")
 
 # Local imports
 from rdigraphs.sim_graph.sim_graph import SimGraph
@@ -495,7 +496,7 @@ class DataGraph(object):
     # #####################
     # Graph edition methods
     # #####################
-    def add_single_node(self, node, attributes={}):
+    def add_single_node(self, node, attributes={}, ignore_warning=False):
         '''
         Adds a single node to datagraph.
 
@@ -508,14 +509,17 @@ class DataGraph(object):
             Name of the node to add.
         attributes dict, optional (default = {}):
             Dictionary of node attributes
+        ignore_warning : bool, optional (default=False)
+            If True, no warning is printed if the node already exists.
         '''
 
         # Check if node already exists
         if node in self.nodes:
-            logging.warning(
-                f'-- -- DUPLICATION: Node {node} already exists in graph '
-                f'{self.label}. Existing node and their edges will be '
-                f'removed')
+            if not ignore_warning:
+                logging.warning(
+                    f'-- -- DUPLICATION: Node {node} already exists in graph '
+                    f'{self.label}. Existing node and their edges will be '
+                    f'removed')
             self.drop_single_node(node)
 
         # Create graph with the input node
@@ -887,9 +891,46 @@ class DataGraph(object):
 
         return
 
+    def add_atts_2_node(self, node, attributes={}):
+        '''
+        Add attributes to node to datagraph.
+
+        In this version, existing attributes are removed.
+
+        Parameters
+        ----------
+        node : str
+            Name of the node to add.
+        attributes dict, optional (default = {}):
+            Dictionary of node attributes
+        '''
+
+        # Check if node already exists
+        if node not in self.nodes:
+            # Raise an error if the node does not exist and exit.
+            raise ValueError(
+                f'-- -- ERROR: Node {node} does not exist in graph '
+                f'{self.label}. No action taken')
+
+        # Merge input attributes with the existing attributes in the node
+        # Get the existing attributes
+        existing_attributes = self.df_nodes.loc[
+            self.df_nodes[self.REF] == node].to_dict(orient='records')[0]
+        # Merge attributes. This will overwrite existing attributes
+        # with the new ones.
+        attributes = {**existing_attributes, **attributes}
+        # Remove attribute self.REF, because it is not an attribute
+        if self.REF in attributes:
+            del attributes[self.REF]
+        
+        # Call to add_single_node to add the node with the new attributes
+        self.add_single_node(node, attributes, ignore_warning=True)
+
+        return
+
     def add_attributes(self, names, values, fill_value=None):
         """
-        Add attributes to the snode
+        Add attributes to nodes in the snode
 
         This is a preliminary version.
         Future versions should evolve in different ways: Check if attribute
@@ -986,6 +1027,22 @@ class DataGraph(object):
 
         return
 
+    def remove_all_edges(self):
+        '''
+        Removes all edges from the graph, given its label.
+        '''
+
+        # Remove all edges
+        self.df_edges = pd.DataFrame(
+            columns=['Source', 'Target', 'Weight'])   # Dataframe of edges
+
+        # Recompute self attributes about edges.
+        self._df_edges_2_atts()    
+        # Update new graph size in metadata
+        self.update_metadata()
+
+        return
+
     def label_nodes_from_features(self, att='tag', thp=2.5):
         """
         Labels each node in the graph according to the labels of its dominant
@@ -1009,7 +1066,10 @@ class DataGraph(object):
         th = thp / len(T_labels)
 
         # Sort indices of the dominant features per node
-        top_features = np.argsort(- self.T)
+        if issparse(self.T):
+            top_features = np.argsort(- self.T.toarray())
+        else:
+            top_features = np.argsort(- self.T)
 
         # Map indices to labels, node by node
         labels = []
@@ -1554,7 +1614,7 @@ class DataGraph(object):
         self._df_edges_2_atts()
 
         # Remove feature matrix, if it exists
-        # FIXME: do not remove but reorder feature meatrix
+        # FIXME: do not remove but reorder feature matrix
         self.remove_feature_matrix()
         logging.warning("-- -- Nodes has been sorted. Be aware that the "
                         "feature matrix, if any has been removed")
@@ -1581,6 +1641,60 @@ class DataGraph(object):
 
         return
 
+    def chain_by_attributes(self, att_base, att_rank):
+        """
+        Creates edges by chaining nodes based on the values of two attributes:
+        (1) att_base: attribute used to define each group of nodes to be linked
+        (2) att_rank: attribute used to create the chain. Nodes are connected
+                      by increasing order of the attribute value.
+
+        Existing edges in the snode are removed.
+        
+        Parameters
+        ----------
+        att_base : str
+            Name of the attribute used as base for ranking
+        att_rank : str
+            Name of the attribute used to rank nodes
+        """
+
+        # Remove existing edges
+        self.df_edges = pd.DataFrame()
+
+        # Get list of unique values in att_base
+        base_values = self.df_nodes[att_base].unique()
+
+        # Create edges
+        new_weighted_edges = []
+
+        for base_value in base_values:
+            nodes = self.df_nodes[self.df_nodes[att_base] == base_value]
+            nodes = nodes.sort_values(att_rank)
+            n = len(nodes)
+            # Get edges connecting the nodes of the trajectory, with weight 1
+            if n > 1:
+                for i in range(n-1):
+                    new_weighted_edges.append(
+                        (nodes.iloc[i][self.REF], nodes.iloc[i+1][self.REF], 1))
+
+        self.df_edges = pd.DataFrame(new_weighted_edges,
+                                     columns=['Source', 'Target', 'Weight'])
+
+        self.df_edges['Type'] = 'Directed'
+
+        # Update redundant snode attributes
+        self._df_edges_2_atts()
+        # Update metadata dictionary
+        self.update_metadata()
+        # Update metadate entries that are specific of the chain graph
+        self.metadata['graph'].update({
+            'category': 'graph',
+            'edge_class': 'directed',
+            'subcategory': 'chain'
+        })
+
+        return
+        
     # ##############
     # Graph analysis
     # ##############
@@ -1735,7 +1849,7 @@ class DataGraph(object):
         self.cluster_labels, self.cluster_sizes = self.CD.detect_communities(
             self.edge_ids, self.weights, n_nodes=self.n_nodes, alg=alg,
             ncmax=ncmax, resolution=r, seed=seed)
-
+        
         # ######################
         # Order clusters by size
 
@@ -1760,6 +1874,14 @@ class DataGraph(object):
             self.metadata['communities'] = {}
         self.metadata['communities'].update({label: self.CD_report})
         self.metadata['communities'][label].update({'time': tm})
+
+        # Add a dictionary cluster_labels: cluster_sizes
+        # First, we conver cluster_labels to str and cluster_sizes to int
+        # to avoid problems with yaml.safe_dump()
+        cluster_labels = [str(c) for c in self.cluster_labels]
+        cluster_sizes = [int(s) for s in self.cluster_sizes]
+        self.metadata['communities'][label].update(
+            {'cluster_sizes': dict(zip(cluster_labels, cluster_sizes))})
 
         # End message
         nc = self.metadata['communities'][label]['n_communities']
@@ -1821,17 +1943,22 @@ class DataGraph(object):
         ----------
         parameter : str {'abs_in_degree', 'abs_out_degree', 'betweenness',
             'centrality', 'closeness', 'cluster_coef', 'degree', 'harmonic',
-            'katz', 'load', 'pageRank'}
+            'katz', 'load', 'pageRank', 'max_weight'}
             Local parameter to compute
         label : str or None, optional (default=None)
             Name of the node attribute that will contain the local parameter
+            
+        Notes
+        -----
+        All parameters are computed using methods from networkx, with the
+        exception of 'max_weight', which is computed using the numpy library.
         """
 
         # Check if parameter is available.
         valid_params = [
             'abs_in_degree', 'abs_out_degree', 'betweenness', 'centrality',
             'closeness', 'cluster_coef', 'degree', 'harmonic', 'katz', 'load',
-            'pageRank']
+            'pageRank', 'max_weight']
         if parameter not in valid_params:
             logging.warning(f"-- Parameter {parameter} not available. No "
                             "action taken")
@@ -1861,18 +1988,19 @@ class DataGraph(object):
         # Methods that intepret weights as connection strengths
         elif parameter in ['centrality', 'degree', 'abs_in_degree',
                            'abs_out_degree', 'cluster_coef', 'katz',
-                           'pageRank']:
+                           'pageRank', 'max_weight']:
             # Get distance matrix
             # Compute a sparse affinity matrix from a list of affinity values
             W = self._computeK()
 
         # ###################
         # Make networkX graph
-        if (not hasattr(self, 'edge_class')
-                or self.edge_class == 'undirected'):
-            G = nx.from_scipy_sparse_array(W)
-        else:
-            G = nx.from_scipy_sparse_array(W, create_using=nx.DiGraph())
+        if parameter != 'max_weight':
+            if (not hasattr(self, 'edge_class')
+                    or self.edge_class == 'undirected'):
+                G = nx.from_scipy_sparse_array(W)
+            else:
+                G = nx.from_scipy_sparse_array(W, create_using=nx.DiGraph())
 
         # ############################################
         # Local graph analysis algorithms
@@ -1940,6 +2068,13 @@ class DataGraph(object):
         elif parameter == 'harmonic':
             C = nxalg.harmonic_centrality(
                 G, nbunch=None, distance='weight', sources=None)
+            
+        elif parameter == 'max_weight':
+            # Compute the maximum weight of the edges of each node, which is
+            # equivalent to the maximum of every row in the affinity matrix
+            C = W.max(axis=1).toarray().flatten()
+            # Convert to dictionary
+            C = {i: C[i] for i in range(self.n_nodes)}
 
         # ########################
         # Store model in dataframe
@@ -2004,8 +2139,8 @@ class DataGraph(object):
 
         return q
 
-    def graph_layout(self, alg='fa2', color_att=None, gravity=1,
-                     save_gexf=True, num_iterations=50):
+    def graph_layout(self, alg='fa2', gravity=1, num_iterations=50,
+                     save_gexf=True, color_att=None):
         """
         Compute the layout of the given graph and save the node positions as
         attributes
@@ -2015,14 +2150,15 @@ class DataGraph(object):
         alg : str {'fa2', 'fr', 'fa2_nx'}, optional (default=fa2)
             Layout algorithm. Ootions are: 'fa2' (forze atlas 2), 'fr'
             (Fruchterman-Reingold) and 'fa2_nx' (force atlas 2 from networkx)
-        color_att : str or None, optional (default=None)
-            Name of the attribute in self.df_nodes to use as color index
         gravity: int, optional (default=1)
             Gravity parameter (only for force atlas 2)
-        save_gexf : bool, optional (default=True)
-            If True, the graph layout is exported to a gexf file
         num_iterations : int, optional (default=50)
             Number of iterations for the layout algorithm
+        save_gexf : bool, optional (default=True)
+            If True, the graph layout is exported to a gexf file
+        color_att : str or None, optional (default=None)
+            Name of the attribute in self.df_nodes to use as color index
+            (only for gexf export).
 
         Notes
         -----
@@ -2077,7 +2213,7 @@ class DataGraph(object):
                 verbose=True)
             logging.info("-- -- Iterating layout algorithm")
             positions = layout.forceatlas2_networkx_layout(
-                G, pos=None, iterations=num_iterations)
+                G, pos=None, iterations=num_iterations, weight_attr='weight')
             
         elif alg == 'fa2_nx':
             logging.info("-- -- Creating layout object")
@@ -2089,7 +2225,7 @@ class DataGraph(object):
                 # Below, the default values
                 jitter_tolerance=1.0, scaling_ratio=2.0,
                 distributed_action=False, strong_gravity=False,
-                node_mass=None, node_size=None, weight=None,
+                node_mass=None, node_size=None, weight='weight',
                 dissuade_hubs=False, linlog=False, seed=None, dim=2)
 
         elif alg == 'fr':
@@ -2106,43 +2242,41 @@ class DataGraph(object):
         # #########################
         # Export graph to gexf file
 
-        # Get attributes to map to colors
-        if color_att:
-            node_attribs = self.df_nodes[color_att].tolist()
-            uniq_attribs = list(set(node_attribs))  # List of unique attributes
-
-            # Get a palette of rgb colors as large as the list of unique
-            # attributes
-            n_colors = len(uniq_attribs)
-            palette = sns.color_palette(n_colors=n_colors)
-            # Map palette of [0,1]-components to a palette of 0-255 comps.
-            palette = [[int(255.999 * x) for x in row] for row in palette]
-
-            # Map attribute values to rgb colors
-            attrib_2_idx = dict(zip(uniq_attribs, palette))
-
-            # Map node attribute to rgb colors
-            node_colors = [attrib_2_idx[a] for a in node_attribs]
-
-        # Get list of degrees
-        degrees = [val for (node, val) in G.degree()]
-
-        # Insert graphical node attributes in graph structure
-        for n in range(self.n_nodes):
-            G.nodes[n]['viz'] = {'size': degrees[n],
-                                 'position': {'x': positions[n][0],
-                                              'y': positions[n][1],
-                                              'z': 0}}
-            if color_att:
-                G.nodes[n]['viz']['color'] = {'r': node_colors[n][0],
-                                              'g': node_colors[n][1],
-                                              'b': node_colors[n][2],
-                                              'a': 1}
-
-        # ######
-        # Saving
-
         if save_gexf:
+            # Get attributes to map to colors
+            if color_att:
+                node_attribs = self.df_nodes[color_att].tolist()
+                # List of unique attributes
+                uniq_attribs = list(set(node_attribs))  
+
+                # Get a palette of rgb colors as large as the list of unique
+                # attributes
+                n_colors = len(uniq_attribs)
+                palette = sns.color_palette(n_colors=n_colors)
+                # Map palette of [0,1]-components to a palette of 0-255 comps.
+                palette = [[int(255.999 * x) for x in row] for row in palette]
+
+                # Map attribute values to rgb colors
+                attrib_2_idx = dict(zip(uniq_attribs, palette))
+
+                # Map node attribute to rgb colors
+                node_colors = [attrib_2_idx[a] for a in node_attribs]
+
+            # Get list of degrees
+            degrees = [val for (node, val) in G.degree()]
+
+            # Insert graphical node attributes in graph structure
+            for n in range(self.n_nodes):
+                G.nodes[n]['viz'] = {'size': degrees[n],
+                                    'position': {'x': positions[n][0],
+                                                'y': positions[n][1],
+                                                'z': 0}}
+                if color_att:
+                    G.nodes[n]['viz']['color'] = {'r': node_colors[n][0],
+                                                'g': node_colors[n][1],
+                                                'b': node_colors[n][2],
+                                                'a': 1}
+
             self.save_gexf(G)
 
         # ###############
@@ -2157,7 +2291,8 @@ class DataGraph(object):
 
     def display_graph(
             self, color_att=None, size_att=None, base_node_size=None,
-            edge_width=None, show_labels=None, path=None):
+            edge_width=None, show_labels=None, path=None,
+            edge_ratio=None):
         """
         Display the given graph using matplolib
 
@@ -2166,9 +2301,12 @@ class DataGraph(object):
         color_att : str or None, optional (default=None)
             Name of the attribute in self.df_nodes to use as color index
             If None, no coloring is used
-        size_att : str or None, optional (default=None)
-            Name of the attribute in self.df_nodes to use as size index
+        size_att : str, dict or None, optional (default=None)
             If none, the degree of the nodes is used
+            Name of the attribute in self.df_nodes that contains the node size 
+            If dict, the key is the name of the attribute in self.df_nodes,
+            and the value is a dict mapping the possible values of the
+            attribute to node sizes.
         base_node_size : int or None, optional (defautl=None)
             Scale factor for the node sizes. The size of each node will be
             proportional to this argument and to the value of the size_att. 
@@ -2181,8 +2319,13 @@ class DataGraph(object):
             If True, label nodes are show. If None, labels are shown for graphs
             with less than 100 nodes only.
         path : str or pathlib.Path or None, optional (default=None)
-            Path to save the figure. If None, the figure is save in the same
+            Path to save the figure. If None, the figure is saved in the same
             folder as the graph, with a standard name
+        edge_ratio : float or None, optional (default=None)
+            If not None, the number of edges shown in the graph is this portion
+            of the total number of edges. Only the edges with higher weights
+            are kept. This is useful to display large graphs. If None, no
+            reduction is applied.
 
         Returns
         -------
@@ -2191,10 +2334,13 @@ class DataGraph(object):
             to represent the attribute value for each node.
         """
 
+        logging.info(f'-- -- Displaying graph {self.label}')
+
         # Estimate attribute values automatically
         if base_node_size is None:
             # size of a degree-1 node
             base_node_size = 40000 / self.n_nodes**1.5
+            logging.info(f"-- -- Base node size set to {base_node_size}")
         if edge_width is None:
             edge_width = 0.1 + 2 / (1 + np.log10(self.n_edges))
         if show_labels is None:
@@ -2203,8 +2349,29 @@ class DataGraph(object):
         # ##################################
         # Transform graph to networkx format
 
+        logging.info("-- -- Transforming graph to networkx format")
+
         # Compute a sparse affinity matrix from a list of affinity values
         K = self._computeK(diag=False)
+
+        # Remove the smallest nonzero values in the matrix
+        # This is to avoid displaying too many edges in the graph
+        if edge_ratio is not None:
+            logging.info("-- -- Reducing number of edges in the graph "
+                         f"to {edge_ratio * 100:.1f}% of the total number of "
+                         "edges")
+            # Get the number of edges to keep
+            n_edges = int(self.n_edges * edge_ratio)
+            # Get the indices of the n_edges largest values in the matrix
+            idx = np.argpartition(K.data, -n_edges)[-n_edges:]
+            # Keep only those values
+            K = K.tocoo()
+            K.data = K.data[idx]
+            K.row = K.row[idx]
+            K.col = K.col[idx]
+            # Convert to csr format
+            K = K.tocsr()
+
         # Convert matrix into graph
         G = nx.from_scipy_sparse_array(K)
 
@@ -2212,11 +2379,12 @@ class DataGraph(object):
         df_xy = self.df_nodes.loc[:, ['x', 'y']]
         positions = df_xy.T.to_dict('list')
 
-        # #########################
-        # Export graph to gexf file
+        # ########################
+        # Compute colors and sizes
 
         # Get attributes to map to colors
         if color_att:
+            # Get list of possible values of the color attribute
             node_attribs = self.df_nodes[color_att].tolist()
             uniq_attribs = list(set(node_attribs))  # List of unique attributes
 
@@ -2234,13 +2402,29 @@ class DataGraph(object):
             node_colors = [attrib_2_idx[a] for a in node_attribs]
 
         # Get list of degrees
-        if size_att:
-            node_size = [base_node_size * val for val in self.df_nodes[size_att]]
-        else:
+        if size_att is None:
+            # The size of the nodes is proportional to the degree
             node_size = [base_node_size * val for (node, val) in G.degree()]
+        elif isinstance(size_att, str): 
+            # If size_att is a string, it is the name of an attribute in
+            # self.df_nodes that contains the node size
+            node_size = [base_node_size * val 
+                         for val in self.df_nodes[size_att]]          
+        elif isinstance(size_att, dict):
+            att_name = list(size_att.keys())[0]
+            mapping = size_att[att_name]
+            # Make a list of (unscaled) node sizes. For each node, this size is 
+            # the value assigned by the mapping to the attribute. If the
+            # attribute value is not in the map, or it is nan, it's set to 1
+            node_size = [1 if pd.isna(val) else mapping.get(val, 1) 
+                        for val in self.df_nodes[att_name]]
+            # Scale by the node sizes
+            node_size = [base_node_size * val for val in node_size]
 
         # #############
         # Graph display
+
+        logging.info("-- -- Generating graph plot. This may take some time...")
 
         # Recompute colors in 0-1 scale
         palette = sns.color_palette(n_colors=n_colors)
@@ -2259,7 +2443,23 @@ class DataGraph(object):
         # Save to file
         if path is None:
             path = self.path2graph / (self.label + '.png')
-        logging.info(f"-- -- Saving graph layout in path {path}")
+
+            # If the path does not exist, we need to save the graph beforehand
+            # to create the folder structure
+            if not self.path2graph.is_dir():
+                self.saveGraph()
+
+        # Crear la leyenda
+        legend_elements = [
+            Patch(facecolor=color, edgecolor='black', label=label)
+            for label, color in attrib_2_idx.items()]
+        plt.legend(handles=legend_elements, loc='upper right', fontsize=12,
+                   title="Node Label")
+
+        logging.info(f"-- -- Saving graph plot in path {path} (it also takes "
+                     "time for large graphs)")
+
+
         # plt.title(f"Graph {self.label}. Color attribute {color_att}")
         plt.savefig(path)
         plt.show(block=False)

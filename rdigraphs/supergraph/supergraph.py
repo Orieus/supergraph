@@ -585,7 +585,7 @@ class SuperGraph(object):
         self.makeSuperNode(ylabel, out_path=out_path)
 
         # Copy main snode attributes from the original snode
-        self.snodes = {}
+        # self.snodes = {}
         self.snodes[ylabel].df_nodes = copy.deepcopy(
             self.snodes[xlabel].df_nodes)
         self.snodes[ylabel].df_edges = copy.deepcopy(
@@ -610,8 +610,12 @@ class SuperGraph(object):
 
         # Update metagraph
         # Read attributes of node xlabel in the metagraph
-        attributes = self.metagraph.get_attributes(xlabel)
-        self.metagraph.add_single_node(ylabel, attributes)
+        attributes = self.metagraph.get_node_attributes(xlabel)
+
+        # if self.metagraph.REF in attributes:
+        #     # Remove the reference to the old node
+        #     del attributes[self.metagraph.REF]       
+        self.metagraph.add_atts_2_node(ylabel, attributes)
 
         return
 
@@ -1137,7 +1141,7 @@ class SuperGraph(object):
     # ###############
     def snode_from_atts(self, source, attrib, target=None, path_snode=None,
                         path_sedge=None, e_label=None, att_size=True,
-                        save_T=True):
+                        save_T=True, make_dense=True):
         """
         Generate a new snode and a new sedge from a given snode in the
         supergraph and one of its attributes.
@@ -1170,6 +1174,10 @@ class SuperGraph(object):
             feature matrix is computed for the target snode.
             The feature vector of a target node is computed as the average of
             the feature vectors from the source node that are linked to it.
+        make_dense : bool, optional (default=True)
+            If True, the feature matrix is converted to a dense matrix if it
+            is sparse. This is the default value, as the feature matrix
+            is expected to be closer to dense by construction.
         """
 
         self.activate_snode(source)
@@ -1269,6 +1277,12 @@ class SuperGraph(object):
             # (note that s0.T is not the transpose of s0 but attributte T
             # of the snode s0)
             T = (Kxy / ksum).T @ s0.T
+
+            # If T is sparse, convert it to a dense matrix
+            # This is not necessary, but, by construction, T can be expected
+            # to be close to dense, so we convert it to a dense matrix
+            if scsp.issparse(T) and make_dense:
+                T = T.todense()
 
             # Add feature labels, if they exist, to the target node
             T_labels = s0.get_feature_labels()
@@ -1544,7 +1558,7 @@ class SuperGraph(object):
             Available options are:
             (1) 'JS' (1 minus Jensen-Shannon (JS) divergence (too slow));
             (2) 'l1' (1 minus l1 distance);
-            (3) 'He' (1 minus squared Hellinger's distance (sklean-based));
+            (3) 'He' (1 minus squared Hellinger's distance (sklearn-based));
             (4) 'He2' (Same as He, but based on a proper implementation);
             (5) 'Gauss' (An exponential function of the squared l2 distance);
             (6) 'l1->JS' (Same as JS, but the graph is computed after
@@ -2343,6 +2357,34 @@ class SuperGraph(object):
             (self.metagraph.df_edges['label'] == yx_label), 'Target'] = x_label
         return
 
+    def chain_by_attributes(self, label, att_base, att_rank):
+        """
+        Creates a new snode by chaining nodes in a snode based on the values of
+        two attributes:
+        (1) att_base: attribute used to define each group of nodes to be linked
+        (2) att_rank: attribute used to create the chain. Nodes are connected
+                      by increasing order of the attribute value.
+
+        Existing edges in the snode are removed.
+        
+        Parameters
+        ----------
+        label : str
+            Name of the snode
+        att_base : str
+            Name of the attribute used as base for ranking
+        att_rank : str
+            Name of the attribute used to rank nodes
+        """
+
+        # Activate snode
+        self.activate_snode(label)
+
+        # Link nodes
+        self.snodes[label].chain_by_attributes(att_base, att_rank)
+
+        return
+
     # #############################
     # Snode handling and processing
     # #############################
@@ -2461,8 +2503,8 @@ class SuperGraph(object):
 
         return
 
-    def graph_layout(self, snode_label, attribute, gravity=1, alg='fa2',
-                     num_iterations=50):
+    def graph_layout(self, snode_label, gravity=1, alg='fa2',
+                     num_iterations=50, save_gexf=True, attribute=None):
         """
         Compute the layout of the given graph
 
@@ -2473,22 +2515,30 @@ class SuperGraph(object):
         gravity: int, optional (default=1)
             Gravity parameter of the graph layout method (only for force atlas
             2)
-        attribute: str
-            Snode attribute used to color the graph
         num_iterations: int, optional (default=50)
             Number of iterations for the graph layout
+        save_gexf: bool, optional (default=True)
+            If True, the graph is saved in GEXF format
+        attribute: str
+            Snode attribute used to color the graph (only for save_gexf=True)
         """
 
+        # WARNING: a possible error may arise here if this method is called
+        #          using the old header: 
+        #          graph_layout(self, snode_label, attribute, gravity=1,
+        #                       alg='fa2', num_iterations=50, save_gexf=True)
+        #           (attribute has been moved to the end of the header and is
+        #           now a keyword argument)
         self.activate_snode(snode_label)
         self.snodes[snode_label].graph_layout(
-            alg=alg, color_att=attribute, gravity=gravity,
-            num_iterations=num_iterations)
+            alg=alg, gravity=gravity, num_iterations=num_iterations,
+            save_gexf=save_gexf, color_att=attribute)
 
         return
 
     def display_graph(
-            self, snode_label, attribute, size_att=None, base_node_size=None,
-            edge_width=None, show_labels=None, path=None):
+            self, snode_label, color_att, size_att=None, base_node_size=None,
+            edge_width=None, show_labels=None, path=None, edge_ratio=None):
         """
         Display the given graph using matplolib
 
@@ -2496,11 +2546,14 @@ class SuperGraph(object):
         ----------
         snode_label : str
             Name of the snode
-        attribute: str
+        color_att : str
             Snode attribute used to color the graph
-        size_att : str or None, optional (default=None)
-            Name of the attribute in self.df_nodes to use as size index
+        size_att : str, dict or None, optional (default=None)
             If none, the degree of the nodes is used
+            Name of the attribute in self.df_nodes that contains the node size 
+            If dict, the key is the name of the attribute in self.df_nodes,
+            and the value is a dict mapping the possible values of the
+            attribute to node sizes.
         base_node_size : int or None, optional (defautl=None)
             Scale factor for the node sizes. The size of each node will be
             proportional to this argument and to the value of the size_att. 
@@ -2515,6 +2568,11 @@ class SuperGraph(object):
         path : str or None, optional (default=None)
             Path to the file where the graph is saved. If None, a default path
             is used.
+        edge_ratio : float or None, optional (default=None)
+            If not None, the number of edges shown in the graph is this portion
+            of the total number of edges. Only the edges with higher weights
+            are kept. This is useful to display large graphs. If None, no
+            reduction is applied.
 
         Returns
         -------
@@ -2525,9 +2583,9 @@ class SuperGraph(object):
 
         self.activate_snode(snode_label)
         att_2_idx = self.snodes[snode_label].display_graph(
-            color_att=attribute, size_att=size_att,
+            color_att=color_att, size_att=size_att,
             base_node_size=base_node_size, edge_width=edge_width,
-            show_labels=show_labels, path=path)
+            show_labels=show_labels, path=path, edge_ratio=edge_ratio)
 
         return att_2_idx
 
