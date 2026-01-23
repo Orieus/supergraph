@@ -2504,7 +2504,8 @@ class SuperGraph(object):
         return
 
     def graph_layout(self, snode_label, gravity=1, alg='fa2',
-                     num_iterations=50, save_gexf=True, attribute=None):
+                     num_iterations=50, save_gexf=True, attribute=None,
+                     seed=None):
         """
         Compute the layout of the given graph
 
@@ -2532,7 +2533,7 @@ class SuperGraph(object):
         self.activate_snode(snode_label)
         self.snodes[snode_label].graph_layout(
             alg=alg, gravity=gravity, num_iterations=num_iterations,
-            save_gexf=save_gexf, color_att=attribute)
+            save_gexf=save_gexf, color_att=attribute, seed=seed)
 
         return
 

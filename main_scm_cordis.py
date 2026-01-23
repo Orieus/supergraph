@@ -19,25 +19,31 @@ from rdigraphs.sgtaskmanager import SgTaskManager
 # #########################
 
 # Select scope:
-scope = 'AI'  # 'AI' or 'cancer'
+scope = 'cancer'  # 'AI' or 'cancer'
 
 # Dictionary of scope-specific parameters
 param_dict = {
     'AI': {'n_topics': 25, 
            'run': 2,
            'ns_G': 0.4,
-           'ew_G': 0.04},
+           'ew_G': 0.04,
+           'n_epn': None,   # None to read the value from the metadata
+           'thp': 2.5},
     'cancer': {'n_topics': 40,
                'run': 8,
                'ns_G': 0.2,
-               'ew_G': 0.02}
+               'ew_G': 0.02,
+               'n_epn': 35,
+               'thp': 3.5}
     }
 
 # Take variable values from the dictionary
 n_topics = param_dict[scope]['n_topics']
 run = param_dict[scope]['run']
-ns_G = param_dict[scope]['ns_G']  # Node size in the graph
-ew_G = param_dict[scope]['ew_G']  # Edge width in the graph
+ns_G = param_dict[scope]['ns_G']    # Node size in the graph layout
+ew_G = param_dict[scope]['ew_G']    # Edge width in the graph layout
+n_epn = param_dict[scope]['n_epn']  # No. of edges/node in similarity graph
+thp = param_dict[scope]['thp']      # Threshold for labelling communities
 
 # ################
 # Other parameters
@@ -51,20 +57,22 @@ project_name = f'cordis{scope}_{n_topics}topics'
 path2project = pathlib.Path('..') / 'projects' / project_name
 path2source = pathlib.Path('..') / 'datasets'
 
-#  Set to True to recompute the similarity graph even if it already exists.
+#  Set to True to recompute the similarity graph even though it already exists
 reset_graph = True
 
 # Similarity graph
 G = f'Cordis{scope}{n_topics}'
 params = {'select_all': True, 'n_topics': f'topics{n_topics}'}
 sim = 'BC'
-n_epn = None     # None to read the value from the metadata
 n_iter_layout = 100
 
 # Graph of communities
 cd_alg = 'leiden'
 # Threshold to sparsify the community graph
-th = 0.016 if n_topics == 26 else 0.011
+th = 0.011
+
+# Seed for randomization in randomized algorithms (layout, community detection)
+seed = 3
 
 # ######################
 # Load or create project
@@ -102,9 +110,14 @@ n_edges = int(n_epn * n_nodes)
 tm.SG.computeSimGraph(G, n_edges=n_edges, similarity=sim, g=1,
                       blocksize=tm.blocksize, useGPU=tm.useGPU)
 
-# Community detection
+# Connected components
 tm.SG.detectCommunities(G, alg='cc', comm_label=None)
-tm.SG.detectCommunities(G, alg=cd_alg, comm_label=None)
+
+# Take the largest connected component
+tm.SG.sub_snode_by_value(G, 'cc', 0, ylabel=None)
+
+# Community detection
+tm.SG.detectCommunities(G, alg=cd_alg, comm_label=None, seed=seed)
 
 # ##########
 # Plot graph
@@ -112,7 +125,7 @@ tm.SG.detectCommunities(G, alg=cd_alg, comm_label=None)
 
 # Graph layout
 tm.SG.graph_layout(G, gravity=40, alg='fa2', num_iterations=n_iter_layout,
-                   attribute=cd_alg)
+                   save_gexf=False, attribute=cd_alg, seed=seed)
 # Graph display
 color_att = cd_alg
 att_2_rgb = tm.SG.display_graph(
@@ -147,14 +160,15 @@ tm.SG.transduce(GC)
 # Community detection
 C = f"{cd_alg}_{G}"
 tm.SG.filter_edges_from_snode(C, th)
-tm.SG.detectCommunities(C, alg=cd_alg, comm_label=None)
+tm.SG.detectCommunities(C, alg=cd_alg, comm_label=None, seed=seed)
 
 # Label nodes
-tm.SG.label_nodes_from_features(C, att='tag', thp=2.5)
+tm.SG.label_nodes_from_features(C, att='tag', thp=thp)
 
 # Plot transductive graph
 tm.SG.graph_layout(
-    C, gravity=40, alg='fr', num_iterations=100, attribute=attribute)
+    C, gravity=40, alg='fr', num_iterations=100, save_gexf=False,
+    attribute=attribute, seed=seed)
 color_att = attribute
 att_2_rgb2 = tm.SG.display_graph(
     C, color_att, size_att=None, base_node_size=300, edge_width=1,
@@ -169,9 +183,9 @@ att_2_rgb2 = tm.SG.display_graph(
 # tm.export_2_parquet(path2G)
 # tm.export_2_parquet(path2C)
 
-# #######################
-# Analyze EU projects
-# #######################
+# ############################
+# Analyze communities projects
+# ############################
 
 # Get community labels from the snodes of the community graph
 tm.SG.activate_snode(C)
@@ -341,8 +355,9 @@ plt.show(block=False)
 # Centrality measures
 # ############################
 
-local_metrics = ['centrality', 'degree', 'betweenness', 'closeness',
+local_metrics = ['centrality', 'degree', 'betweenness',
                  'pageRank', 'cluster_coef']
+# closeness not included because its is a bit slow
 # katz not included because it raises an error.
 
 # Compute local metrics

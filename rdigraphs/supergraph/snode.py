@@ -9,6 +9,7 @@ import pprint
 import yaml
 import pathlib
 import copy
+import random
 
 from time import time
 
@@ -2140,7 +2141,7 @@ class DataGraph(object):
         return q
 
     def graph_layout(self, alg='fa2', gravity=1, num_iterations=50,
-                     save_gexf=True, color_att=None):
+                     save_gexf=True, color_att=None, seed=None):
         """
         Compute the layout of the given graph and save the node positions as
         attributes
@@ -2159,6 +2160,8 @@ class DataGraph(object):
         color_att : str or None, optional (default=None)
             Name of the attribute in self.df_nodes to use as color index
             (only for gexf export).
+        seed : int or None (default=None)
+            Seed for randomization. If None, the current system time is used
 
         Notes
         -----
@@ -2194,6 +2197,10 @@ class DataGraph(object):
         # Compute positions using layout algorithm
         if alg == 'fa2':
             logging.info("-- -- Creating layout object")
+
+            # This is to make the layout reproducible
+            random.seed(seed)
+
             layout = ForceAtlas2(
                 # Behavior alternatives
                 outboundAttractionDistribution=False,  # Dissuade hubs
@@ -2226,13 +2233,13 @@ class DataGraph(object):
                 jitter_tolerance=1.0, scaling_ratio=2.0,
                 distributed_action=False, strong_gravity=False,
                 node_mass=None, node_size=None, weight='weight',
-                dissuade_hubs=False, linlog=False, seed=None, dim=2)
+                dissuade_hubs=False, linlog=False, seed=seed, dim=2)
 
         elif alg == 'fr':
             positions = nx.drawing.layout.spring_layout(
                 G, k=None, pos=None, fixed=None, iterations=num_iterations,
                 threshold=0.0001, weight='weight', scale=1, center=None,
-                dim=2, seed=None)
+                dim=2, seed=seed)
 
         # Store positions in nodes dataframe
         # This might be unnecessary if the graph will be save in gexf
